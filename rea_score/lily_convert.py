@@ -7,7 +7,7 @@ from .dom import Voice, events_from_take, split_by_voice
 from .primitives import Chord, Event, Key, Length, Pitch, Position, Scale
 
 import reapy as rpr
-import abjad
+# import abjad
 
 KEY = Key('fis', Scale.major)
 

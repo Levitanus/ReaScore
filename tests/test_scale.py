@@ -51,3 +51,7 @@ def test_pitch_resolver() -> None:
 
     fis_dorian = sc.Key('fis', sc.Scale.dorian)
     assert sc.midi_to_note(60, fis_dorian) == 'b♯3'
+
+    # test against known bugs
+    assert sc.midi_to_note(64, fis_dur) == 'e4'
+    assert sc.midi_to_note(62, fis_dur) == 'd4'

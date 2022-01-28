@@ -1,6 +1,7 @@
 from enum import Enum, auto
 import re
 from typing import Dict, List, Optional
+import warnings
 
 
 class Accidental(Enum):
@@ -157,16 +158,17 @@ class PitchResolver:
         except ValueError:
             print(midi, key_midi)
             if midi == key_midi + 1 and key.scale is Scale.minor:
-                # print('minor II♭')
+                print('minor II♭')
                 final = cls.get_accidental_of_next_note(root_idx, midi)
             elif midi == (key_midi + 8) % 12 and key.scale is Scale.major:
-                # print('major VII♭')
+                print('major VI♭')
+                print(f'key root: {cls.natural_number[root_idx]}')
                 final = cls.get_accidental_of_next_note(
-                    (root_idx + 4) % 6, midi
+                    (root_idx + 4) % 7, midi
                 )
             else:
-                # print('regular')
-                acc_found = '♯' if not used_acc else used_acc.pop()
+                print('regular')
+                acc_found = None if not used_acc else used_acc.pop()
                 final = cls.get_accidental_of_midi(acc_found, midi)
         # print(midi, key, optimized_scale, string_scale)
         return cls._with_octave(final, octave)
@@ -180,22 +182,36 @@ class PitchResolver:
         return pitch + str(octave)
 
     @classmethod
-    def get_accidental_of_midi(cls, accidental: str, midi: int) -> str:
+    def get_accidental_of_midi(
+        cls, accidental: Optional[str], midi: int
+    ) -> str:
         notes = cls.note_of_nr[midi]
+        acc = accidental if accidental else '♯'
         for note in notes:
-            if re.match(r'\w' + re.escape(accidental) + r'$', note):
+            if re.match(r'\w' + re.escape(acc) + r'$', note):
                 return note
-        raise ValueError(
+        if accidental is None:
+            return ENHARM_ACC[midi][Accidental.white].lower()
+        warnings.warn(
             "Can't Find proper accidental for accidental:{}, midi:{}".format(
                 accidental, midi
             )
         )
+        return ENHARM_ACC[midi][Accidental.white].lower()
+        # raise ValueError(
+        #     "Can't Find proper accidental for accidental:{}, midi:{}".format(
+        #         accidental, midi
+        #     )
+        # )
 
     @classmethod
     def get_accidental_of_next_note(cls, root_idx: int, midi: int) -> str:
         note_idx = root_idx + 1
-        if note_idx >= 7:
+        if note_idx > 6:
             note_idx = 0
+        print(
+            f'root: {cls.natural_number[root_idx]}, next: {cls.natural_number[note_idx]}'
+        )
         current_note = cls.natural_number[note_idx]
         notes = cls.note_of_nr[midi]
         for note in notes:
