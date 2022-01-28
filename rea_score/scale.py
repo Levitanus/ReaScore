@@ -156,18 +156,18 @@ class PitchResolver:
             # print('note from scale')
             final = string_scale[optimized_scale.index(midi)]
         except ValueError:
-            print(midi, key_midi)
+            # print(midi, key_midi)
             if midi == key_midi + 1 and key.scale is Scale.minor:
-                print('minor II♭')
+                # print('minor II♭')
                 final = cls.get_accidental_of_next_note(root_idx, midi)
             elif midi == (key_midi + 8) % 12 and key.scale is Scale.major:
-                print('major VI♭')
-                print(f'key root: {cls.natural_number[root_idx]}')
+                # print('major VI♭')
+                # print(f'key root: {cls.natural_number[root_idx]}')
                 final = cls.get_accidental_of_next_note(
                     (root_idx + 4) % 7, midi
                 )
             else:
-                print('regular')
+                # print('regular')
                 acc_found = None if not used_acc else used_acc.pop()
                 final = cls.get_accidental_of_midi(acc_found, midi)
         # print(midi, key, optimized_scale, string_scale)
@@ -209,9 +209,6 @@ class PitchResolver:
         note_idx = root_idx + 1
         if note_idx > 6:
             note_idx = 0
-        print(
-            f'root: {cls.natural_number[root_idx]}, next: {cls.natural_number[note_idx]}'
-        )
         current_note = cls.natural_number[note_idx]
         notes = cls.note_of_nr[midi]
         for note in notes:

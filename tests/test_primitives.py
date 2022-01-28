@@ -40,6 +40,8 @@ def test_position() -> None:
     assert pos1.bar == 1
     assert pos1.bar_position == 3 / 4
     assert pos1.position == 3
+    assert pos1.bar_end_distance == 1 / 4
+    assert pos1 == pr.Position.from_fraction(3 / 4)
 
     pos2 = pr.Position(6.5)
     assert pos2.bar == 2
@@ -68,6 +70,7 @@ def test_length() -> None:
     assert len1 > 2
     assert len1 // 1 == 2
     assert len1 % 1 == 1 / 8
+    assert len1 == pr.Length.from_fraction(17 / 8)
     assert str(len1) == '<Length 17/8>'
 
 

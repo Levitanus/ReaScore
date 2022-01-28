@@ -1,8 +1,11 @@
 from typing import Dict, List, Optional
 import reapy as rpr
+
 # from reapy import reascript_api as RPR
 
-from .primitives import Attachment, Chord, Event, Length, Pitch, Position
+from .primitives import (
+    Attachment, Chord, Event, Length, Pitch, Position, Fractured
+)
 
 from pprint import pformat, pprint
 
@@ -18,12 +21,49 @@ class EventPackager:
             if self.key.bar_position == 0:
                 barcheck = BarCheck(self.key.bar)
                 if self.key.position != 0 and barcheck not in event.preambula:
-                    print(f'add barcheck at {self.key} to the {event}')
+                    # print(f'add barcheck at {self.key} to the {event}')
                     event.preambula.append(barcheck)
+            # if self.key.bar_end_distance < event.length:
+            return self.split_by_position(event)
             self.voice.events[self.key] = event
             return
         self.voice.append_to_chord(self.key, event)
         # raise NotImplementedError()
+
+    def split_by_position(self, event: Event) -> None:
+        if self.key.bar_end_distance < event.length:
+            left, append_part = event.split(
+                Length(float(self.key.bar_end_distance) * 4), tie=True
+            )
+        else:
+            left = event
+        parts = Fractured.normalized(self.key.bar_end_distance)
+        # print(
+        #     'split:',
+        #     left,
+        #     # append_part,
+        #     parts,
+        #     sep='\n- ',
+        # )
+        final_events = {}
+        current_pos = self.key
+        for part in parts:
+            print(left, part)
+            if left.length <= part:
+                self.voice.events[current_pos] = left
+                current_pos = Position(
+                    current_pos.position + left.length.length
+                )
+                break
+            left, right = left.split(Length.from_fraction(part), tie=True)
+            final_events[current_pos] = left
+            current_pos = Position(current_pos.position + left.length.length)
+            left = right
+        if self.key.bar_end_distance < event.length:
+            final_events[current_pos] = append_part
+        # pprint(final_events)
+        for pos, event in final_events.items():
+            self.voice[pos].append(event)
 
 
 class Voice:
@@ -168,6 +208,9 @@ class BarCheck(Attachment):
         if isinstance(other, BarCheck) and other.bar_nr == self.bar_nr:
             return True
         return False
+
+    def __repr__(self) -> str:
+        return f'<BarCheck at bar {self.bar_nr}>'
 
 
 if __name__ == '__main__':

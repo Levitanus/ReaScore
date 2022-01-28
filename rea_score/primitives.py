@@ -60,10 +60,16 @@ class Fractured:
             other = other.fraction
         return self.fraction > other
 
+    def __ge__(self, other: ty.Union[Fraction, 'Fractured', int]) -> bool:
+        return self > other or self == other
+
     def __lt__(self, other: ty.Union[Fraction, 'Fractured', int]) -> bool:
         if isinstance(other, Fractured):
             other = other.fraction
         return self.fraction < other
+
+    def __le__(self, other: ty.Union[Fraction, 'Fractured', int]) -> bool:
+        return self < other or self == other
 
     def __add__(self, other: ty.Union[Fraction, 'Fractured', int]) -> Fraction:
         if isinstance(other, Fractured):
@@ -118,11 +124,16 @@ class Position(Fractured):
             self.position = RPR.TimeMap_timeToQN(position_sec)  #type:ignore
         else:
             raise TypeError('At least one argument has to be specified.')
-        self.bar, self._bar_position = self._get_bar_position(self.position)
+        (self.bar, self._bar_position,
+         self._bar_end_distance) = self._get_bar_position(self.position)
 
     @property
     def fraction(self) -> Fraction:
         return Fraction(self.position / 4).limit_denominator(LIMIT_DENOMINATOR)
+
+    @staticmethod
+    def from_fraction(frac: ty.Union[Fraction, float]) -> 'Position':
+        return Position(float(frac) * 4)
 
     @property
     def bar_position(self) -> Fraction:
@@ -133,14 +144,25 @@ class Position(Fractured):
     def bar_position_norm(self) -> ty.Tuple[Fraction, ...]:
         return tuple(reversed(self.normalized(self.bar_position)))
 
+    @property
+    def bar_end_distance(self) -> Fraction:
+        return Fraction(self._bar_end_distance / 4
+                        ).limit_denominator(LIMIT_DENOMINATOR)
+
+    @property
+    def bar_end_distance_qn(self) -> float:
+        return self._bar_end_distance
+
     @staticmethod
-    def _get_bar_position(position_beats: float) -> ty.Tuple[int, Fraction]:
+    def _get_bar_position(
+        position_beats: float
+    ) -> ty.Tuple[int, float, float]:
         (
             bar,
             m_start,
             m_end,
         ) = rpr.Project().beats_to_measures(position_beats)
-        return bar, Fraction(position_beats - m_start)
+        return bar, position_beats - m_start, m_end - position_beats
 
     @rpr.inside_reaper()
     def percize_distance(
@@ -203,6 +225,10 @@ class Length(Fractured):
     @property
     def fraction(self) -> Fraction:
         return Fraction(self.length / 4).limit_denominator(LIMIT_DENOMINATOR)
+
+    @staticmethod
+    def from_fraction(frac: ty.Union[Fraction, float]) -> 'Length':
+        return Length(float(frac) * 4)
 
     def __repr__(self) -> str:
         return f'<Length {self.fraction}{" full-bar" if self.full_bar else ""}>'
@@ -314,6 +340,7 @@ class Event:
         left, right = deepcopy(self), deepcopy(self)
         left.length = at_length
         right.length = Length(self.length.length - at_length.length)
+        right.preambula = []
         if tie:
             left.pitch.tie = tie
         return left, right
