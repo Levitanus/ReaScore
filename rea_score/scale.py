@@ -24,12 +24,9 @@ class Key:
 
     def __init__(self, tonic: str, scale: 'Scale') -> None:
         tonic = tonic.lower()
-        if 'is' in tonic:
-            tonic = tonic.replace('is', '♯')
-        elif 'es' in tonic:
-            tonic = tonic.replace('es', '♭')
-        elif 's' in tonic:
-            tonic = tonic.replace('s', '♭')
+        replacements = {'is': '♯', 'es': '♭', 's': '♭'}
+        for pattern, repl in replacements.items():
+            tonic = re.sub(pattern, repl, tonic)
         self.tonic = tonic
         self.scale = scale
 
