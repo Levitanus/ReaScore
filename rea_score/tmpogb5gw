@@ -1,0 +1,15 @@
+
+import rope.base.project
+from rope.base import libutils
+
+myproject = rope.base.project.Project(
+    '/home/levitanus/gits/ReaScore')
+#myproject.validate('/home/levitanus/gits/ReaScore/rea_score/scale.py')
+myproject.validate()
+ropy = libutils.path_to_resource(myproject, '/home/levitanus/gits/ReaScore/rea_score/scale.py')
+
+from rope.refactor.rename import Rename
+changes = Rename(myproject, ropy, 1369).get_changes('nr_of_note', docs=True)
+myproject.do(changes)
+
+myproject.close()
