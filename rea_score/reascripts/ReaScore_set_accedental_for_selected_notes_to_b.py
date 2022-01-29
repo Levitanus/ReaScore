@@ -1,0 +1,4 @@
+from rea_score.inspector import set_accidental_for_selected_notes
+from rea_score.scale import Accidental
+
+set_accidental_for_selected_notes(Accidental.es)

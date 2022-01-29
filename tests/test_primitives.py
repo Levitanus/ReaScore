@@ -1,5 +1,7 @@
 from fractions import Fraction
 
+from rea_score.primitives import NotationPitch
+
 import rea_score.primitives as pr
 
 from copy import deepcopy
@@ -124,3 +126,10 @@ def test_chord() -> None:
     left, right = chord.split(pr.Length(1 / 8 * 4), tie=True)
     assert left.pitches != right.pitches
     assert left.pitches[0].tie is True
+
+
+def test_notation_pitch() -> None:
+    assert NotationPitch.reascore_tokens(
+        'NOTE 0 69 text ReaScore|accidental:isis articulation accent ornament '
+        'tremolo voice 1'
+    ) == ['accidental:isis']

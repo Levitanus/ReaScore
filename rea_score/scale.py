@@ -20,6 +20,18 @@ class Accidental(Enum):
             string = re.sub(pattern, repl, string)  # type:ignore
         return getattr(cls, string)  # type:ignore
 
+    def to_str(self) -> str:
+        if self is Accidental.is_:
+            return 'is'
+        if self is Accidental.isis:
+            return 'isis'
+        if self is Accidental.es:
+            return 'es'
+        if self is Accidental.eses:
+            return 'eses'
+        if self is Accidental.white:
+            return 'white'
+
 
 class Key:
 

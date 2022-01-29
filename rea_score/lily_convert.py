@@ -88,10 +88,6 @@ def render_chord(chord: Chord) -> str:
 
 
 def render_preambula(event: Event) -> str:
-    # out = ''
-    # for elm in event.preambula:
-    #     out += elm.ly_render()
-    # return out
     return ''.join(elm.ly_render() for elm in event.preambula)
 
 

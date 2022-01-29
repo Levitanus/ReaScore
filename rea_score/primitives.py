@@ -2,10 +2,13 @@ from copy import deepcopy
 from enum import Enum, auto
 from fractions import Fraction
 from pprint import pformat
+import re
 import typing as ty
+import warnings
 # import librosa
 import reapy as rpr
 from reapy import reascript_api as RPR
+from reapy.core.item.midi_event import MIDIEventDict
 
 from .scale import Accidental, ENHARM_ACC, Scale, midi_to_note, Key
 
@@ -194,7 +197,7 @@ class Position(Fractured):
         else:
             first = self
             last = other
-        print(self, other, ':', first, last)
+        # print(self, other, ':', first, last)
         f_bar, _, f_end = rpr.Project().beats_to_measures(first.position)
         l_bar, l_start, _ = rpr.Project().beats_to_measures(last.position)
         bar: int = l_bar - f_bar
@@ -232,13 +235,6 @@ class Length(Fractured):
 
     def __repr__(self) -> str:
         return f'<Length {self.fraction}{" full-bar" if self.full_bar else ""}>'
-
-    # TODO
-    # def bar_position_norm(
-    #     self, bar_position_norm: ty.Tuple[Fraction, ...]
-    # ) -> ty.Tuple[Fraction, ...]:
-    #     if self.fraction > 1:
-    #         head = self.fraction // 1
 
 
 class Pitch:
@@ -306,6 +302,125 @@ class Attachment:
         raise NotImplementedError()
 
 
+class NotationEvent:
+
+    @property
+    def for_midi(self) -> str:
+        return 'test_notation'
+
+    def update(self, new: 'NotationEvent') -> None:
+        pass
+
+
+class NotationPitch(NotationEvent):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__()
+        self.pitch = pitch
+
+    def update(self, new: 'NotationEvent') -> bool:
+        if not isinstance(new, NotationPitch):
+            return False
+        if self.pitch != new.pitch:
+            warnings.warn(
+                'Pitches are not equal! {} replaced with {}'.format(
+                    self.pitch, new.pitch
+                )
+            )
+        return True
+
+    @classmethod
+    def is_reascore_event(cls, event: MIDIEventDict) -> bool:
+        if (event['buf'][0:2]) != [0xff, 0x0f]:
+            return False
+        return cls.is_reascore_event_buf(event['buf'])
+
+    @classmethod
+    def from_token(cls, token: str,
+                   pitch: Pitch) -> ty.Optional['NotationPitch']:
+        if token.startswith('accidental'):
+            return NotationAccidental.from_midi(pitch, token)
+        if token.startswith('voice'):
+            return NotationVoice.from_midi(pitch, token)
+        return None
+
+    @classmethod
+    def reascore_tokens(cls, string: str) -> ty.List[str]:
+        tokens = re.search(r'\stext\s(ReaScore\S+)', string)
+        if not tokens:
+            return []
+        return tokens.groups()[0].split('|')
+
+    @classmethod
+    def is_reascore_event_buf(cls, buf: ty.List[int]) -> bool:
+        string = bytes(buf[2:]).decode('latin-1')
+        # print(string)
+        if not string.startswith('NOTE'):
+            return False
+        if cls.reascore_tokens(string):
+            return True
+        return False
+
+    @classmethod
+    def from_midibuf(cls, buf: ty.List[int]) -> ty.List['NotationPitch']:
+        string = bytes(buf[2:]).decode('latin-1')
+        if not NotationPitch.is_reascore_event_buf(buf):
+            raise ValueError(f'Not a ReaScore notation event: {string}')
+        # print(string)
+        tokens = cls.reascore_tokens(string)
+        if m := re.match(r'NOTE\s\d+\s(\d+)', string):
+            pitch = Pitch(int(m.groups()[0]))
+        else:
+            raise ValueError(f'Can not get pitch from string: {string}')
+        events = []
+        # print(tokens)
+        for token in tokens[1:]:
+            event = NotationPitch.from_token(token, pitch)
+            if event is not None:
+                events.append(event)
+            # print(token, event)
+        return events
+
+    @classmethod
+    def to_midi_buf(
+        cls,
+        events: ty.List['NotationPitch'],
+        check_pitch: ty.Optional[Pitch] = None,
+        original_buf: ty.Optional[ty.List[int]] = None,
+    ) -> ty.List[int]:
+        pitch = ty.cast(Pitch, check_pitch)
+        tokens = []
+        if len(events) == 0:
+            raise ValueError('can note pack empty list')
+        for event in events:
+            tokens.append(event.for_midi)
+            if event.pitch is None:
+                raise ValueError("only pitched notation supported")
+            if pitch != event.pitch:
+                raise ValueError(
+                    """Notations for different pitches has to \
+                    be packed separatelly."""
+                )
+            pitch = event.pitch
+        tokens_str = f" text ReaScore|{'|'.join(tokens)}"
+        if original_buf:
+            string = bytes(original_buf[2:]).decode('latin-1')
+            original_tokens = '|'.join(cls.reascore_tokens(string))
+            if original_tokens:
+                string = re.sub(
+                    f'text ReaScore|{original_tokens}', tokens_str, string
+                )
+            else:
+                string += tokens_str
+        else:
+            string = f"NOTE 0 {pitch.midi_pitch}{tokens_str}"
+        return [
+            0xff,
+            0x0f,
+            *list(string.encode('latin-1')),
+        ]
+
+
 class Event:
 
     def __init__(
@@ -324,6 +439,10 @@ class Event:
 
     def __repr__(self) -> str:
         return f"<Event {self._params}>"
+
+    def apply_notation(self, notation: NotationEvent) -> None:
+        if isinstance(notation, NotationAccidental):
+            self.pitch.accidental = notation.accidental
 
     def make_chord(self) -> 'Chord':
         return Chord(*self._params, pitches=[self.pitch])
@@ -405,3 +524,49 @@ class Chord(Event):
             self.pitches.extend(event.pitches)
         else:
             self.pitches.append(event.pitch)
+
+
+class NotationAccidental(NotationPitch):
+
+    def __init__(self, pitch: Pitch, accidental: Accidental) -> None:
+        super().__init__(pitch)
+        self.accidental = accidental
+
+    @property
+    def for_midi(self) -> str:
+        return 'accidental:' + self.accidental.to_str()
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationAccidental':
+        return NotationAccidental(
+            pitch, Accidental.from_str(string.split(':')[1])
+        )
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.accidental = new.accidental
+        return True
+
+
+class NotationVoice(NotationPitch):
+
+    def __init__(self, pitch: Pitch, voice: int) -> None:
+        super().__init__(pitch)
+        self.voice = voice
+
+    @property
+    def for_midi(self) -> str:
+        return f'voice:{self.voice}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationVoice':
+        return NotationVoice(pitch, int(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.voice = new.voice
+        return True

@@ -1,10 +1,11 @@
+import re
 from typing import Dict, List, Optional
 import reapy as rpr
-
-# from reapy import reascript_api as RPR
+from reapy.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
-    Attachment, Chord, Event, Length, Pitch, Position, Fractured
+    Attachment, Chord, Event, Length, NotationPitch, NotationEvent, Pitch,
+    Position, Fractured
 )
 
 from pprint import pformat, pprint
@@ -21,14 +22,9 @@ class EventPackager:
             if self.key.bar_position == 0:
                 barcheck = BarCheck(self.key.bar)
                 if self.key.position != 0 and barcheck not in event.preambula:
-                    # print(f'add barcheck at {self.key} to the {event}')
                     event.preambula.append(barcheck)
-            # if self.key.bar_end_distance < event.length:
             return self.split_by_position(event)
-            self.voice.events[self.key] = event
-            return
         self.voice.append_to_chord(self.key, event)
-        # raise NotImplementedError()
 
     def split_by_position(self, event: Event) -> None:
         if self.key.bar_end_distance < event.length:
@@ -38,17 +34,9 @@ class EventPackager:
         else:
             left = event
         parts = Fractured.normalized(self.key.bar_end_distance)
-        # print(
-        #     'split:',
-        #     left,
-        #     # append_part,
-        #     parts,
-        #     sep='\n- ',
-        # )
         final_events = {}
         current_pos = self.key
         for part in parts:
-            print(left, part)
             if left.length <= part:
                 self.voice.events[current_pos] = left
                 current_pos = Position(
@@ -61,7 +49,6 @@ class EventPackager:
             left = right
         if self.key.bar_end_distance < event.length:
             final_events[current_pos] = append_part
-        # pprint(final_events)
         for pos, event in final_events.items():
             self.voice[pos].append(event)
 
@@ -90,20 +77,16 @@ class Voice:
         chord = self.events[position]
         if not isinstance(chord, Chord):
             chord = chord.make_chord()
-        # print('append_to_chord:', position, chord, event, sep='\n    ')
         if chord.length == event.length:
-            # print('    leght are equal, append')
             chord.append(event)
             return
         elif chord.length < event.length:
             left, right = event.split(chord.length, tie=True)
             chord.append(left)
-            # print('    chord is shorter:', chord, right, sep='\n' + ' ' * 8)
         else:  # chord.length > event.length
             left, right = chord.split(event.length, tie=True)
             left.append(event)
             self.events[position] = left
-            # print('    chord is longer:', left, right, sep='\n' + ' ' * 8)
         key = Position(position.position + left.length.length)
         self[key].append(right)
 
@@ -138,14 +121,12 @@ class Voice:
                 )
             if distance := position.percize_distance(last):
                 left, bars, right = distance
-                print(f'left={left}, bars={bars}, right={right}')
                 if left:
                     out[last].append(
                         Event(left, Pitch(), voice_nr=self.voice_nr)
                     )
                 for bar_nr in range(bars):
                     bar = last.bar + bar_nr
-                    print(bar, last.bar, bar_nr)
                     bar_info = rpr.Project().measure_info(bar)
                     bar_pos = Position(bar_info['start'])
                     bar_length = Length(
@@ -155,7 +136,6 @@ class Voice:
                         Event(bar_length, Pitch(), voice_nr=self.voice_nr)
                     )
                 if right:
-
                     out[Position(position.position - right.length)].append(
                         Event(right, Pitch(), voice_nr=self.voice_nr)
                     )
@@ -164,19 +144,50 @@ class Voice:
         return out
 
 
-@rpr.inside_reaper()
-def events_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
+def notes_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
     events: Dict[Position, List[Event]] = {}
     for note in take.notes:
         info = note.infos
         start = take.ppq_to_beat(info['ppq_position'])
         end = take.ppq_to_beat(info['ppq_end'])
-        # print(start, end)
         pos = Position(start)
         if pos not in events:
             events[pos] = []
         events[pos].append(Event(Length(end - start), Pitch(info['pitch'], )))
     return events
+
+
+def _filter_notations(event: MIDIEventDict) -> bool:
+    return NotationPitch.is_reascore_event(event)
+
+
+def pitch_notations_from_take(
+    take: rpr.Take
+) -> Dict[Position, List[NotationPitch]]:
+    events: Dict[Position, List[NotationPitch]] = {}
+
+    for event in filter(_filter_notations, take.get_midi()):
+        pos = Position(take.ppq_to_beat(event['ppq']))
+        n_events = NotationPitch.from_midibuf(event['buf'])
+        if pos not in events:
+            events[pos] = []
+        events[pos].extend(n_events)
+    return events
+
+
+@rpr.inside_reaper()
+def events_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
+    # events: Dict[Position, List[Event]] = {}
+    note_events = notes_from_take(take)
+    pitch_notations = pitch_notations_from_take(take)
+    for pos, notes in note_events.items():
+        for note in notes:
+            if pos in pitch_notations:
+                for notation in pitch_notations[pos]:
+                    # print(pos, note, notation)
+                    if notation.pitch == note.pitch:
+                        note.apply_notation(notation)
+    return note_events
 
 
 def split_by_voice(events: Dict[Position, List[Event]]) -> Dict[int, Voice]:

@@ -2,6 +2,7 @@ from rea_score import scale as sc
 
 
 def test_accidental() -> None:
+    assert sc.Accidental.from_str('isis') == sc.Accidental.isis
     assert sc.Accidental.from_str('♯') == sc.Accidental.is_
     assert sc.Accidental.from_str('♯♯') == sc.Accidental.isis
     assert sc.Accidental.from_str('♭') == sc.Accidental.es
