@@ -100,7 +100,7 @@ def render_chord(chord: Chord) -> str:
 
 
 def render_preambula(event: Event) -> str:
-    return ''.join(elm.ly_render() for elm in event.preambula)
+    return ' '.join(elm.ly_render() for elm in event.preambula) + ' '
 
 
 def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:

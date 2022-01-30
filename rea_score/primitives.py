@@ -302,10 +302,21 @@ class Attachment:
         raise NotImplementedError()
 
 
-class Clef(Enum):
+class Clef(Attachment, Enum):
     bass = 'bass'
     treble = 'treble'
     alto = 'alto'
+    tenor = 'tenor'
+    percussion = "percussion"
+
+    GG = "GG"
+    french = "french"
+    soprano = "soprano"
+    mezzosoprano = "mezzosoprano"
+    baritone = "baritone"
+    altovarC = "altovarC"
+    tenorvarC = "tenorvarC"
+    subbass = "subbass"
 
     def ly_render(self) -> str:
         return f'\\clef {self.value}'
@@ -353,6 +364,8 @@ class NotationPitch(NotationEvent):
             return NotationVoice.from_midi(pitch, token)
         if token.startswith('staff'):
             return NotationStaff.from_midi(pitch, token)
+        if token.startswith('clef'):
+            return NotationClef.from_midi(pitch, token)
         return None
 
     @classmethod
@@ -468,6 +481,8 @@ class Event:
             self.voice_nr = notation.voice
         if isinstance(notation, NotationStaff):
             self.staff_nr = notation.staff
+        if isinstance(notation, NotationClef):
+            self.preambula.append(notation.clef)
 
     def make_chord(self) -> 'Chord':
         return Chord(*self._params, pitches=[self.pitch])
@@ -631,3 +646,28 @@ class NotationStaff(NotationPitch):
 
     def __repr__(self) -> str:
         return f'<NotationStaff {self.pitch}, staff:{self.staff}>'
+
+
+class NotationClef(NotationPitch):
+
+    def __init__(self, pitch: Pitch, clef: Clef) -> None:
+        super().__init__(pitch)
+        self.clef = clef
+
+    @property
+    def for_midi(self) -> str:
+        return f'clef:{self.clef.value}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationClef':
+        return NotationClef(pitch, Clef(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.clef = new.clef
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationClef {self.pitch}, clef:{self.clef}>'

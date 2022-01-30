@@ -10,8 +10,8 @@ from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    NotationAccidental, NotationEvent, NotationPitch, NotationVoice,
-    NotationStaff, Pitch
+    Clef, NotationAccidental, NotationClef, NotationEvent, NotationPitch,
+    NotationVoice, NotationStaff, Pitch
 )
 
 from rea_score.scale import Accidental
@@ -222,4 +222,17 @@ def set_staff_of_selected_notes(staff: int) -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
+    )
+
+
+@rpr.inside_reaper()
+def set_clef_of_selected_notes(clef: Clef) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))[0]
+    NotationPitchInspector().set(
+        editor.take, [selected], [NotationClef(Pitch(127), clef)]
     )
