@@ -1,11 +1,11 @@
 import re
-from typing import Dict, List, Optional
+from typing import Dict, Iterable, Iterator, List, Optional
 import reapy as rpr
 from reapy.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
-    Attachment, Chord, Event, Length, NotationPitch, NotationEvent, Pitch,
-    Position, Fractured
+    Attachment, Chord, Clef, Event, Length, NotationPitch, NotationEvent,
+    Pitch, Position, Fractured
 )
 
 from pprint import pformat, pprint
@@ -44,12 +44,16 @@ class EventPackager:
                 )
                 break
             left, right = left.split(Length.from_fraction(part), tie=True)
+            if right.length.length == 0:
+                break
             final_events[current_pos] = left
             current_pos = Position(current_pos.position + left.length.length)
             left = right
         if self.key.bar_end_distance < event.length:
             final_events[current_pos] = append_part
         for pos, event in final_events.items():
+            if event.length == 0:
+                continue
             self.voice[pos].append(event)
 
 
@@ -58,6 +62,11 @@ class Voice:
     def __init__(self, voice_nr: int = 1) -> None:
         self.voice_nr = voice_nr
         self.events: Dict[Position, Event] = {}
+
+    @property
+    def voice_str(self) -> str:
+        repl = {1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five'}
+        return f'voice{repl[self.voice_nr]}'
 
     def __getitem__(self, key: Position) -> EventPackager:
         return EventPackager(self, key)
@@ -72,11 +81,13 @@ class Voice:
         return f"<Voice {self.voice_nr}: \n   {pformat(self.events,3)}>"
 
     def append_to_chord(self, position: Position, event: Event) -> None:
+        # print(f'append_to_chord: {position}, {event}')
         if event.pitch.midi_pitch is None:
             return
         chord = self.events[position]
         if not isinstance(chord, Chord):
             chord = chord.make_chord()
+            self.events[position] = chord
         if chord.length == event.length:
             chord.append(event)
             return
@@ -87,6 +98,8 @@ class Voice:
             left, right = chord.split(event.length, tie=True)
             left.append(event)
             self.events[position] = left
+        if right.length.length == 0:
+            return
         key = Position(position.position + left.length.length)
         self[key].append(right)
 
@@ -103,13 +116,15 @@ class Voice:
                 left, right = ev.split(
                     Length(float(r_pos - pos) * 4), tie=True
                 )
+                if right.length.length == 0:
+                    break
                 self.events[pos] = left
                 self[r_pos].append(right)
                 return self.sort()
         return self
 
     def with_rests(self) -> 'Voice':
-        out = Voice()
+        out = Voice(self.voice_nr)
         last = Position(0)
         for position, event in sorted(self.events.items()):
             if position < last:
@@ -142,6 +157,43 @@ class Voice:
             out[position].append(event)
             last = Position(position.position + event.length.length)
         return out
+
+
+class Staff:
+
+    def __init__(self, staff_nr: int, clef: Optional[Clef] = None) -> None:
+        self.staff_nr = staff_nr
+        self.voices: List[Voice] = []
+        if clef is None:
+            if staff_nr > 1:
+                clef = Clef.bass
+            else:
+                clef = Clef.treble
+        self.clef = clef
+
+    def __repr__(self) -> str:
+        return "<Staff {nr}, clef: {clef}, {voices}>".format(
+            nr=self.staff_nr, clef=self.clef.ly_render(), voices=self.voices
+        )
+
+    def append(self, voice: Voice) -> None:
+        self.voices.append(voice)
+
+    def extend(self, voices: Iterable[Voice]) -> None:
+        self.voices.extend(voices)
+
+    def __getitem__(self, index: int) -> Voice:
+        return self.voices[index]
+
+    def __setitem__(self, index: int, voice: Voice) -> None:
+        self.voices[index] = voice
+
+    def __delitem__(self, index: int) -> None:
+        del self.voices[index]
+
+    def __iter__(self) -> Iterator[Voice]:
+        for voice in self.voices:
+            yield voice
 
 
 def notes_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
@@ -184,8 +236,7 @@ def events_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
         for note in notes:
             if pos in pitch_notations:
                 for notation in pitch_notations[pos]:
-                    # print(pos, note, notation)
-                    if notation.pitch == note.pitch:
+                    if notation.pitch.midi_pitch == note.pitch.midi_pitch:
                         note.apply_notation(notation)
     return note_events
 
@@ -199,9 +250,34 @@ def split_by_voice(events: Dict[Position, List[Event]]) -> Dict[int, Voice]:
                 voices[key] = Voice(key)
             voice = voices[key]
             voice[position].append(event)
+    temp = voices
+    voices = {}
+    for nr in sorted(temp):
+        voices[nr] = temp[nr]
     for voice in voices.values():
         voice.sort()
+    # pprint(voices)
     return voices
+
+
+def split_by_staff(events: Dict[Position, List[Event]]) -> List[Staff]:
+    staff_dicts: Dict[int, Dict[Position, List[Event]]] = {}
+    for position, event_list in events.items():
+        for event in event_list:
+            key = event.staff_nr
+            if key not in staff_dicts:
+                staff_dicts[key] = {}
+            staff = staff_dicts[key]
+            if position not in staff:
+                staff[position] = []
+            staff[position].append(event)
+    staffs: List[Staff] = []
+    for nr in sorted(staff_dicts):
+        events = staff_dicts[nr]
+        staffs.append(Staff(nr))
+        voices = split_by_voice(events)
+        staffs[-1].extend(voices.values())
+    return staffs
 
 
 class BarCheck(Attachment):

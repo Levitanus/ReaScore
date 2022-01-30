@@ -302,6 +302,15 @@ class Attachment:
         raise NotImplementedError()
 
 
+class Clef(Enum):
+    bass = 'bass'
+    treble = 'treble'
+    alto = 'alto'
+
+    def ly_render(self) -> str:
+        return f'\\clef {self.value}'
+
+
 class NotationEvent:
 
     @property
@@ -342,6 +351,8 @@ class NotationPitch(NotationEvent):
             return NotationAccidental.from_midi(pitch, token)
         if token.startswith('voice'):
             return NotationVoice.from_midi(pitch, token)
+        if token.startswith('staff'):
+            return NotationStaff.from_midi(pitch, token)
         return None
 
     @classmethod
@@ -428,14 +439,24 @@ class Event:
         length: Length,
         pitch: Pitch = Pitch(None),
         voice_nr: int = 1,
+        staff_nr: int = 1,
         preambula: ty.Optional[ty.List[Attachment]] = None,
     ) -> None:
-        (self.length, self.pitch, self.voice_nr, self.preambula
-         ) = (length, pitch, voice_nr, preambula if preambula else [])
+        (
+            self.length, self.pitch, self.voice_nr, self.staff_nr,
+            self.preambula
+        ) = (
+            length, pitch, voice_nr, staff_nr, preambula if preambula else []
+        )
 
     @property
-    def _params(self) -> ty.Tuple[Length, Pitch, int, ty.List[Attachment]]:
-        return self.length, self.pitch, self.voice_nr, self.preambula
+    def _params(
+        self
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment]]:
+        return (
+            self.length, self.pitch, self.voice_nr, self.staff_nr,
+            self.preambula
+        )
 
     def __repr__(self) -> str:
         return f"<Event {self._params}>"
@@ -443,6 +464,10 @@ class Event:
     def apply_notation(self, notation: NotationEvent) -> None:
         if isinstance(notation, NotationAccidental):
             self.pitch.accidental = notation.accidental
+        if isinstance(notation, NotationVoice):
+            self.voice_nr = notation.voice
+        if isinstance(notation, NotationStaff):
+            self.staff_nr = notation.staff
 
     def make_chord(self) -> 'Chord':
         return Chord(*self._params, pitches=[self.pitch])
@@ -487,10 +512,13 @@ class Chord(Event):
         length: Length,
         pitch: ty.Optional[Pitch] = None,
         voice_nr: int = 1,
+        staff_nr: int = 1,
         preambula: ty.Optional[ty.List[Attachment]] = None,
         pitches: ty.List[Pitch] = None,  # type:ignore
     ) -> None:
-        super().__init__(length, Pitch(PITCH_IS_CHORD), voice_nr, preambula)
+        super().__init__(
+            length, Pitch(PITCH_IS_CHORD), voice_nr, staff_nr, preambula
+        )
         if not pitches:
             raise ValueError("pitches must be specified")
         self.pitches = pitches
@@ -498,7 +526,7 @@ class Chord(Event):
     @property
     def _params(
         self
-    ) -> ty.Tuple[Length, Pitch, int, ty.List[Attachment], ty.List[Pitch]]:
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment], ty.List[Pitch]]:
         return (*super()._params, self.pitches)
 
     def __repr__(self) -> str:
@@ -549,6 +577,11 @@ class NotationAccidental(NotationPitch):
         self.accidental = new.accidental
         return True
 
+    def __repr__(self) -> str:
+        return '<NotationAccidental {}, accidental:{}>'.format(
+            self.pitch, self.accidental.to_str()
+        )
+
 
 class NotationVoice(NotationPitch):
 
@@ -570,3 +603,31 @@ class NotationVoice(NotationPitch):
         super().update(new)
         self.voice = new.voice
         return True
+
+    def __repr__(self) -> str:
+        return f'<NotationVoice {self.pitch}, voice:{self.voice}>'
+
+
+class NotationStaff(NotationPitch):
+
+    def __init__(self, pitch: Pitch, staff: int) -> None:
+        super().__init__(pitch)
+        self.staff = staff
+
+    @property
+    def for_midi(self) -> str:
+        return f'staff:{self.staff}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationStaff':
+        return NotationStaff(pitch, int(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.staff = new.staff
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationStaff {self.pitch}, staff:{self.staff}>'

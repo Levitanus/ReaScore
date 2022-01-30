@@ -1,12 +1,18 @@
 from copy import deepcopy
 from pathlib import Path
 
+from rea_score.lily_convert import render_part
+from rea_score.dom import split_by_staff
+
 import reapy as rpr
 from reapy import reascript_api as RPR
 from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
-from rea_score.primitives import NotationAccidental, NotationEvent, NotationPitch, NotationVoice, Pitch
+from rea_score.primitives import (
+    NotationAccidental, NotationEvent, NotationPitch, NotationVoice,
+    NotationStaff, Pitch
+)
 
 from rea_score.scale import Accidental
 
@@ -113,7 +119,9 @@ class TrackInspector:
         export_path = self.export_path
         for item in self.track.items:
             events.update(events_from_take(item.active_take))
-        lily = render_staff(split_by_voice(events))
+        staves = split_by_staff(events)
+        print(staves)
+        lily = render_part(staves)
         pdf = render(lily, export_path)
         while not pdf.exists():
             ...
@@ -152,10 +160,8 @@ class NotationPitchInspector:
                     continue
                 original_buf = notation['buf']
                 for old in parced:
-                    updated = False
                     for new in note_events:
                         if old.update(new) is True:
-                            updated = True
                             updated_events.append(new)
                 parced.extend(
                     filter(
@@ -203,4 +209,17 @@ def set_voice_of_selected_notes(voice: int) -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationVoice(Pitch(127), voice)]
+    )
+
+
+@rpr.inside_reaper()
+def set_staff_of_selected_notes(staff: int) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
     )

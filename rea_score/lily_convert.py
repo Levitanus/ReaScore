@@ -3,21 +3,33 @@ from warnings import warn
 from typing import Dict, List, NewType, Optional, Tuple, Union
 import re
 
-from .dom import Voice, events_from_take, split_by_voice
+from .dom import Staff, Voice, events_from_take, split_by_voice
 from .primitives import Chord, Event, Key, Length, Pitch, Position, Scale
 
-import reapy as rpr
+# import reapy as rpr
 # import abjad
 
 KEY = Key('fis', Scale.major)
 
 
-def render_staff(voices: Dict[int, Voice]) -> str:
-    staff = """\\new Staff <<{voices}>>"""
+def render_part(staves: List[Staff]) -> str:
+    if len(staves) == 1:
+        return render_staff(staves[0])
+    group = 'GrandStaff'
+    part_string = """\\new {group} <<{staves}>>"""
+    return part_string.format(
+        group=group, staves='\n'.join(render_staff(staff) for staff in staves)
+    )
+
+
+def render_staff(staff: Staff) -> str:
+    staff_string = """\\new Staff <<{clef} {voices}>>"""
     rendered_voices = []
-    for index, voice in voices.items():
-        rendered_voices.append(render_voice(voice, index))
-    return staff.format(voices='\n'.join(rendered_voices))
+    for voice in staff:
+        rendered_voices.append(render_voice(voice, voice.voice_nr))
+    return staff_string.format(
+        clef=staff.clef.ly_render(), voices='\n'.join(rendered_voices)
+    )
 
 
 def render_voice(
@@ -41,7 +53,7 @@ def render_voice(
         else:
             raise TypeError(event)
     key = KEY.ly_render()
-    return f"\\new Voice {{{key} {' '.join(out)}}}"
+    return f"\\new Voice = \"{voice.voice_nr}\" {{\\{voice.voice_str} {key} {' '.join(out)}}}"
 
 
 def render_event(event: Event) -> str:
@@ -149,16 +161,3 @@ def render_pitch(pitch: Pitch) -> Tuple[str, str]:
     else:
         tie = ''
     return name.lower() + octave, tie
-
-
-def any_to_lily(obj: Union[Voice, rpr.Take]) -> str:
-    if isinstance(obj, rpr.Take):
-        return render_staff(split_by_voice(events_from_take(obj)))
-    if isinstance(obj, Voice):
-        return render_voice(obj)
-    raise TypeError("Actually not literally any!")
-
-
-if __name__ == '__main__':
-    with rpr.inside_reaper():
-        print(any_to_lily(rpr.Project().selected_items[0].active_take))
