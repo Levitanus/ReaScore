@@ -77,7 +77,8 @@ def render(lilypond: str, file: Path) -> Path:
         io.write('\n'.join(lines))
     # print(subprocess.check_output(['lilypond', str(ly)]))
     pdf = file.with_suffix('.pdf')
-    print(subprocess.Popen(['lilypond', str(ly)], cwd=pdf.parent))
+    process = subprocess.Popen(['lilypond', str(ly)], cwd=pdf.parent)
+    process.wait()
     return pdf
 
 

@@ -120,11 +120,11 @@ class TrackInspector:
         for item in self.track.items:
             events.update(events_from_take(item.active_take))
         staves = split_by_staff(events)
-        print(staves)
+        # print(staves)
         lily = render_part(staves)
         pdf = render(lily, export_path)
-        while not pdf.exists():
-            ...
+        # while not pdf.exists():
+        #     ...
         with open(pdf, 'rb') as in_:
             with open(ProjectInspector().temp_pdf, 'wb') as out:
                 out.write(in_.read())

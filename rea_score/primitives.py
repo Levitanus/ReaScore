@@ -12,8 +12,9 @@ from reapy.core.item.midi_event import MIDIEventDict
 
 from .scale import Accidental, ENHARM_ACC, Scale, midi_to_note, Key
 
-LIMIT_DENOMINATOR = 128
+LIMIT_DENOMINATOR = 96
 PITCH_IS_CHORD = 12800
+PITCH_IS_TUPLET = 12801
 ROUND_QUARTERS = 3
 
 
@@ -24,27 +25,39 @@ class Fractured:
         raise NotImplementedError()
 
     @classmethod
+    def power_of_two(cls, target: int) -> int:
+        if target > 1:
+            for i in range(1, int(target)):
+                if (2**i >= target):
+                    return ty.cast(int, 2**(i - 1))
+        elif target in (1, 0):
+            return target
+        raise ValueError(f"can't resolve numerator: {target}")
+
+    @classmethod
+    def closest_power_of_two(cls, target: int) -> int:
+        if target >= 2:
+            for i in range(int(target)):
+                if 2**i == target:
+                    return 2**i
+                if 2**i > target:
+                    return ty.cast(int, 2**(i - 1))
+        elif target in (0, 1):
+            return target
+        raise ValueError(f"can't resolve target: {target}")
+
+    @classmethod
     def normalized(
         cls, fraction: Fraction, head: ty.Tuple[Fraction, ...] = tuple()
     ) -> ty.Tuple[Fraction, ...]:
-
-        def power_of_two(target: int) -> int:
-            if target > 1:
-                for i in range(1, int(target)):
-                    if (2**i >= target):
-                        return ty.cast(int, 2**(i - 1))
-            elif target in (1, 0):
-                return target
-            raise ValueError(f"can't resolve numerator: {target}")
-
         num = fraction.numerator
         den = fraction.denominator
 
         if den == 1 or num < 5:
             return fraction,
-        if num == power_of_two(num):
+        if num == cls.power_of_two(num):
             return fraction,
-        num_nr = power_of_two(num)
+        num_nr = cls.power_of_two(num)
         whole = Fraction(num_nr / den)
         remainder = Fraction((num - num_nr) / den)
         if remainder.numerator > 3:
@@ -338,6 +351,9 @@ class NotationPitch(NotationEvent):
         super().__init__()
         self.pitch = pitch
 
+    def apply_to_event(self, event: 'Event') -> None:
+        pass
+
     def update(self, new: 'NotationEvent') -> bool:
         if not isinstance(new, NotationPitch):
             return False
@@ -453,36 +469,33 @@ class Event:
         pitch: Pitch = Pitch(None),
         voice_nr: int = 1,
         staff_nr: int = 1,
-        preambula: ty.Optional[ty.List[Attachment]] = None,
+        prefix: ty.Optional[ty.List[Attachment]] = None,
+        postfix: ty.Optional[ty.List[Attachment]] = None,
     ) -> None:
         (
-            self.length, self.pitch, self.voice_nr, self.staff_nr,
-            self.preambula
+            self.length, self.pitch, self.voice_nr, self.staff_nr, self.prefix,
+            self.postfix
         ) = (
-            length, pitch, voice_nr, staff_nr, preambula if preambula else []
+            length, pitch, voice_nr, staff_nr, prefix if prefix else [],
+            postfix if postfix else []
         )
 
     @property
     def _params(
         self
-    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment]]:
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment],
+                  ty.List[Attachment]]:
         return (
-            self.length, self.pitch, self.voice_nr, self.staff_nr,
-            self.preambula
+            self.length,
+            self.pitch,
+            self.voice_nr,
+            self.staff_nr,
+            self.prefix,
+            self.postfix,
         )
 
     def __repr__(self) -> str:
         return f"<Event {self._params}>"
-
-    def apply_notation(self, notation: NotationEvent) -> None:
-        if isinstance(notation, NotationAccidental):
-            self.pitch.accidental = notation.accidental
-        if isinstance(notation, NotationVoice):
-            self.voice_nr = notation.voice
-        if isinstance(notation, NotationStaff):
-            self.staff_nr = notation.staff
-        if isinstance(notation, NotationClef):
-            self.preambula.append(notation.clef)
 
     def make_chord(self) -> 'Chord':
         return Chord(*self._params, pitches=[self.pitch])
@@ -498,8 +511,9 @@ class Event:
             )
         left, right = deepcopy(self), deepcopy(self)
         left.length = at_length
-        right.length = Length(self.length.length - at_length.length)
-        right.preambula = []
+        right.length = Length(self.length - at_length)
+        right.prefix = []
+        left.postfix = []
         if tie:
             left.pitch.tie = tie
         return left, right
@@ -528,11 +542,17 @@ class Chord(Event):
         pitch: ty.Optional[Pitch] = None,
         voice_nr: int = 1,
         staff_nr: int = 1,
-        preambula: ty.Optional[ty.List[Attachment]] = None,
+        prefix: ty.Optional[ty.List[Attachment]] = None,
+        postfix: ty.Optional[ty.List[Attachment]] = None,
         pitches: ty.List[Pitch] = None,  # type:ignore
     ) -> None:
         super().__init__(
-            length, Pitch(PITCH_IS_CHORD), voice_nr, staff_nr, preambula
+            length,
+            Pitch(PITCH_IS_CHORD),
+            voice_nr,
+            staff_nr,
+            prefix,
+            postfix,
         )
         if not pitches:
             raise ValueError("pitches must be specified")
@@ -541,7 +561,8 @@ class Chord(Event):
     @property
     def _params(
         self
-    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment], ty.List[Pitch]]:
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment],
+                  ty.List[Attachment], ty.List[Pitch]]:
         return (*super()._params, self.pitches)
 
     def __repr__(self) -> str:
@@ -569,11 +590,101 @@ class Chord(Event):
             self.pitches.append(event.pitch)
 
 
+class TupletRate:
+
+    def __init__(self, numerator: int, denominator: int) -> None:
+        self.numerator = numerator
+        self.denominator = denominator
+
+    @staticmethod
+    def from_str(string: str) -> 'TupletRate':
+        return TupletRate(*(int(s) for s in string.split('/')))
+
+    def to_str(self) -> str:
+        return f'{self.numerator}/{self.denominator}'
+
+    def __repr__(self) -> str:
+        return f"<TupletRate {self.to_str()}>"
+
+
+class Tuplet(Event):
+
+    def __init__(
+        self,
+        length: Length,
+        pitch: ty.Optional[Pitch] = None,
+        voice_nr: int = 1,
+        staff_nr: int = 1,
+        prefix: ty.Optional[ty.List[Attachment]] = None,
+        postfix: ty.Optional[ty.List[Attachment]] = None,
+        rate: TupletRate = TupletRate(3, 2),
+        events: ty.Optional[ty.List[Event]] = None,
+    ) -> None:
+        super().__init__(
+            length,
+            Pitch(PITCH_IS_TUPLET),
+            voice_nr,
+            staff_nr,
+            prefix,
+            postfix,
+        )
+        self._rate = rate
+        if events is None:
+            events = []
+        self._events = events
+
+    @property
+    def _params(
+        self
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment],
+                  ty.List[Attachment], TupletRate, ty.List[Event]]:
+        return (*super()._params, self.rate, self.events)
+
+    def __repr__(self) -> str:
+        return f"<Tuplet {self.rate.to_str()} {pformat(self._params, indent=4)}>"
+
+    @property
+    def rate(self) -> TupletRate:
+        real, truncated = 0, 0
+        for event in self._events:
+            fraction = event.length.fraction
+            real += float(fraction)
+            truncated += fraction.numerator / Fractured.closest_power_of_two(
+                fraction.denominator
+            )
+        rate = Fraction(real / truncated).limit_denominator(LIMIT_DENOMINATOR)
+        self._rate = TupletRate(rate.denominator, rate.numerator)
+        return self._rate
+
+    @property
+    def events(self) -> ty.List[Event]:
+        out = []
+        for event in self._events:
+            ev = deepcopy(event)
+            fraction = ev.length.fraction
+            denom = Fractured.closest_power_of_two(fraction.denominator)
+            ev.length = Length.from_fraction(
+                Fraction(fraction.numerator / denom)
+            )
+            out.append(ev)
+        return out
+
+    def append(self, event: Event) -> None:
+        if event.length == 0:
+            return
+        self.postfix = event.postfix
+        self._events.append(event)
+        self.length.length += event.length.length
+
+
 class NotationAccidental(NotationPitch):
 
     def __init__(self, pitch: Pitch, accidental: Accidental) -> None:
         super().__init__(pitch)
         self.accidental = accidental
+
+    def apply_to_event(self, event: Event) -> None:
+        event.pitch.accidental = self.accidental
 
     @property
     def for_midi(self) -> str:
@@ -604,6 +715,9 @@ class NotationVoice(NotationPitch):
         super().__init__(pitch)
         self.voice = voice
 
+    def apply_to_event(self, event: Event) -> None:
+        event.voice_nr = self.voice
+
     @property
     def for_midi(self) -> str:
         return f'voice:{self.voice}'
@@ -628,6 +742,9 @@ class NotationStaff(NotationPitch):
     def __init__(self, pitch: Pitch, staff: int) -> None:
         super().__init__(pitch)
         self.staff = staff
+
+    def apply_to_event(self, event: Event) -> None:
+        event.staff_nr = self.staff
 
     @property
     def for_midi(self) -> str:
@@ -654,6 +771,9 @@ class NotationClef(NotationPitch):
         super().__init__(pitch)
         self.clef = clef
 
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self.clef)
+
     @property
     def for_midi(self) -> str:
         return f'clef:{self.clef.value}'
@@ -671,3 +791,64 @@ class NotationClef(NotationPitch):
 
     def __repr__(self) -> str:
         return f'<NotationClef {self.pitch}, clef:{self.clef}>'
+
+
+class NotationTupletBegin(NotationPitch, Attachment):
+
+    def __init__(self, pitch: Pitch, rate: TupletRate) -> None:
+        super().__init__(pitch)
+        self.rate = rate
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return f'\\tuplet {self.rate.to_str()}{{'
+
+    @property
+    def for_midi(self) -> str:
+        return f'tuplet_begin:{self.rate.to_str()}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletBegin':
+        return NotationTupletBegin(
+            pitch, TupletRate.from_str(string.split(':')[1])
+        )
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.tuplet = new.tuplet
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationTupletBegin {self.pitch}, tuplet:{self.rate}>'
+
+
+class NotationTupletEnd(NotationPitch, Attachment):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'}}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'tuplet_end'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletEnd':
+        return NotationTupletEnd(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationTupletEnd {self.pitch}>'

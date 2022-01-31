@@ -5,7 +5,7 @@ from reapy.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
     Attachment, Chord, Clef, Event, Length, NotationPitch, NotationEvent,
-    Pitch, Position, Fractured
+    NotationTupletBegin, NotationTupletEnd, Pitch, Position, Fractured, Tuplet
 )
 
 from pprint import pformat, pprint
@@ -44,7 +44,7 @@ class EventPackager:
                 )
                 break
             left, right = left.split(Length.from_fraction(part), tie=True)
-            if right.length.length == 0:
+            if right.length == 0:
                 break
             final_events[current_pos] = left
             current_pos = Position(current_pos.position + left.length.length)
@@ -100,7 +100,7 @@ class Voice:
             self.events[position] = left
         if right.length.length == 0:
             return
-        key = Position(position.position + left.length.length)
+        key = Position(position + left.length)
         self[key].append(right)
 
     def sort(self) -> 'Voice':
@@ -116,7 +116,7 @@ class Voice:
                 left, right = ev.split(
                     Length(float(r_pos - pos) * 4), tie=True
                 )
-                if right.length.length == 0:
+                if right.length == 0:
                     break
                 self.events[pos] = left
                 self[r_pos].append(right)
@@ -157,6 +157,45 @@ class Voice:
             out[position].append(event)
             last = Position(position.position + event.length.length)
         return out
+
+    def with_tuplets(self) -> 'Voice':
+        new_events = {}
+        tuplet = None
+        tuplet_opened = False
+        for position, event in self.events.items():
+            p_denom = position.fraction.denominator
+            l_denom = event.length.fraction.denominator
+            tuplet_length = l_denom != Fractured.closest_power_of_two(l_denom)
+            tuplet_pos = p_denom != Fractured.closest_power_of_two(p_denom)
+            for item in event.prefix:
+                if isinstance(item, NotationTupletBegin):
+                    tuplet_opened = True
+            if (tuplet_pos or tuplet_length or tuplet_opened):
+                # print(f"p_denom={p_denom}, l_denom={l_denom}")
+                # print(f"appending {event} to tuplet")
+                if tuplet is None:
+                    tuplet = Tuplet(Length(0))
+                    new_events[position] = tuplet
+                tuplet.append(event)
+                for item in event.postfix:
+                    if isinstance(item, NotationTupletEnd):
+                        tuplet_opened = False
+                        tuplet = None
+                continue
+            if tuplet is not None and not tuplet_length and not tuplet_pos:
+                # print(f"tuplet is complete: {tuplet}")
+                tuplet = None
+            # print(f"appending {event} to dict")
+            new_events[position] = event
+
+        self.events = new_events
+        return self
+
+    def finalized(self) -> 'Voice':
+        self.sort()
+        with_rests = self.with_rests()
+        with_tuples = with_rests.with_tuplets()
+        return with_tuples
 
 
 class Staff:
@@ -237,7 +276,7 @@ def events_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
             if pos in pitch_notations:
                 for notation in pitch_notations[pos]:
                     if notation.pitch.midi_pitch == note.pitch.midi_pitch:
-                        note.apply_notation(notation)
+                        notation.apply_to_event(note)
     return note_events
 
 

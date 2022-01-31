@@ -1,6 +1,6 @@
 from fractions import Fraction
 
-from rea_score.primitives import NotationPitch
+from rea_score.primitives import Fractured, NotationPitch
 
 import rea_score.primitives as pr
 
@@ -35,6 +35,13 @@ def test_simple() -> None:
 def test_notmalized() -> None:
     fr1 = FracturedConcrete(9, 16)
     assert fr1.normalized(fr1.fraction) == (Fraction(1 / 16), Fraction(1 / 2))
+
+    assert 2**1 == 2
+    assert Fractured.closest_power_of_two(2) == 2
+    assert Fractured.closest_power_of_two(4) == 4
+    assert Fractured.closest_power_of_two(24) == 16
+    assert Fractured.closest_power_of_two(int(8 / 3 * 2)) == 4
+    assert Fractured.closest_power_of_two(int(16 / 5 * 2)) == 4
 
 
 def test_position() -> None:
@@ -100,7 +107,7 @@ def test_pitch() -> None:
 def test_event() -> None:
     assert str(pr.Event(pr.Length(15 / 16 * 4), pr.Pitch(58))) == (
         '<Event (<Length 15/16>, <Pitch midi:58, a♯3' +
-        ' (in c:major), tie=False>, 1, [])>'
+        ' (in c:major), tie=False>, 1, 1, [], [])>'
     )
 
     ev = pr.Event(pr.Length(2), pr.Pitch(60, tie=True))
@@ -132,4 +139,4 @@ def test_notation_pitch() -> None:
     assert NotationPitch.reascore_tokens(
         'NOTE 0 69 text ReaScore|accidental:isis articulation accent ornament '
         'tremolo voice 1'
-    ) == ['accidental:isis']
+    ) == ['ReaScore', 'accidental:isis']

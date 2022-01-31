@@ -4,7 +4,7 @@ from typing import Dict, List, NewType, Optional, Tuple, Union
 import re
 
 from .dom import Staff, Voice, events_from_take, split_by_voice
-from .primitives import Chord, Event, Key, Length, Pitch, Position, Scale
+from .primitives import Chord, Event, Key, Length, Pitch, Position, Scale, Tuplet
 
 # import reapy as rpr
 # import abjad
@@ -37,8 +37,8 @@ def render_voice(
     index: Optional[int] = None,
     name: Optional[str] = None
 ) -> str:
-    voice.sort()
-    voice = voice.with_rests()
+    # print(f"finalizing voice {voice}")
+    voice = voice.finalized()
     args = {}
     if name:
         if index:
@@ -48,6 +48,8 @@ def render_voice(
     for event in voice.events.values():
         if isinstance(event, Chord):
             out.append(render_chord(event))
+        elif isinstance(event, Tuplet):
+            out.append(render_tuplet(event))
         elif isinstance(event, Event):
             out.append(render_event(event))
         else:
@@ -70,7 +72,7 @@ def render_event(event: Event) -> str:
     # if tied and tie:
     #     tie = ''
     return string.format(
-        preambula=render_preambula(event),
+        preambula=render_prefix(event),
         pitch=pitch,
         length=length,
         notations='',
@@ -90,7 +92,7 @@ def render_chord(chord: Chord) -> str:
     else:
         tie = ''
     return string.format(
-        preambula=render_preambula(chord),
+        preambula=render_prefix(chord),
         pitches=' '.join(pitches),
         length=length,
         notations='',
@@ -99,8 +101,17 @@ def render_chord(chord: Chord) -> str:
     )
 
 
-def render_preambula(event: Event) -> str:
-    return ' '.join(elm.ly_render() for elm in event.preambula) + ' '
+def render_tuplet(tuplet: Tuplet) -> str:
+    string = "{prefix} \\tuplet {rate} {{{events}}}"
+    return string.format(
+        prefix=render_prefix(tuplet),
+        rate=tuplet.rate.to_str(),
+        events=' '.join(render_event(ev) for ev in tuplet.events)
+    )
+
+
+def render_prefix(event: Event) -> str:
+    return ' '.join(elm.ly_render() for elm in event.prefix) + ' '
 
 
 def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:

@@ -1,5 +1,8 @@
-from rea_score import inspector as it
-import reapy as rpr
+# from fractions import Fraction
 
-take = rpr.Project().selected_items[0].active_take
-print(it.Notation().get(take, take.notes[0])[0].accidental)
+# quarter = Fraction(1 / 4)
+
+# eight = Fraction(1 / 8)
+# print(quarter / 3)
+
+# assert quarter ==

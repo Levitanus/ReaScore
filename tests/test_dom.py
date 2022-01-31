@@ -21,13 +21,13 @@ def test_event_packager():
             Event(
                 Length.from_fraction(1),
                 Pitch(60, tie=True),
-                preambula=[BarCheck(2)]
+                prefix=[BarCheck(2)]
             ),
         Position.from_fraction(2):
             Event(
                 Length.from_fraction(5 / 8),
                 Pitch(60, tie=False),
-                preambula=[BarCheck(3)]
+                prefix=[BarCheck(3)]
             ),
     }
     pprint(list(zip(voice.events.items(), expected_events.items())))
