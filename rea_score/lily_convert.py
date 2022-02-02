@@ -46,16 +46,23 @@ def render_voice(
         args['name'] = name
     out = []
     for event in voice.events.values():
-        if isinstance(event, Chord):
-            out.append(render_chord(event))
-        elif isinstance(event, Tuplet):
-            out.append(render_tuplet(event))
-        elif isinstance(event, Event):
-            out.append(render_event(event))
-        else:
-            raise TypeError(event)
+        event_str = ''
+        event_str = render_any_event(event)
+        out.append(event_str)
     key = KEY.ly_render()
     return f"\\new Voice = \"{voice.voice_nr}\" {{\\{voice.voice_str} {key} {' '.join(out)}}}"
+
+
+def render_any_event(event) -> str:
+    if isinstance(event, Chord):
+        event_str = render_chord(event)
+    elif isinstance(event, Tuplet):
+        event_str = render_tuplet(event)
+    elif isinstance(event, Event):
+        event_str = render_event(event)
+    else:
+        raise TypeError(event)
+    return event_str
 
 
 def render_event(event: Event) -> str:
@@ -106,7 +113,7 @@ def render_tuplet(tuplet: Tuplet) -> str:
     return string.format(
         prefix=render_prefix(tuplet),
         rate=tuplet.rate.to_str(),
-        events=' '.join(render_event(ev) for ev in tuplet.events)
+        events=' '.join(render_any_event(ev) for ev in tuplet.events)
     )
 
 

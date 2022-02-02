@@ -511,7 +511,7 @@ class Event:
             )
         left, right = deepcopy(self), deepcopy(self)
         left.length = at_length
-        right.length = Length(self.length - at_length)
+        right.length = Length(self.length.length - at_length.length)
         right.prefix = []
         left.postfix = []
         if tie:

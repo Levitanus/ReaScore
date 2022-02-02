@@ -18,11 +18,13 @@ class EventPackager:
         self.key = key
 
     def append(self, event: Event) -> None:
+        if event.length == 0:
+            return
         if self.key not in self.voice.events:
             if self.key.bar_position == 0:
                 barcheck = BarCheck(self.key.bar)
-                if self.key.position != 0 and barcheck not in event.preambula:
-                    event.preambula.append(barcheck)
+                if self.key.position != 0 and barcheck not in event.prefix:
+                    event.prefix.append(barcheck)
             return self.split_by_position(event)
         self.voice.append_to_chord(self.key, event)
 
@@ -44,7 +46,7 @@ class EventPackager:
                 )
                 break
             left, right = left.split(Length.from_fraction(part), tie=True)
-            if right.length == 0:
+            if right.length.length == 0:
                 break
             final_events[current_pos] = left
             current_pos = Position(current_pos.position + left.length.length)
@@ -98,9 +100,9 @@ class Voice:
             left, right = chord.split(event.length, tie=True)
             left.append(event)
             self.events[position] = left
-        if right.length.length == 0:
+        if right.length == 0:
             return
-        key = Position(position + left.length)
+        key = Position(position.position + left.length.length)
         self[key].append(right)
 
     def sort(self) -> 'Voice':
@@ -116,7 +118,7 @@ class Voice:
                 left, right = ev.split(
                     Length(float(r_pos - pos) * 4), tie=True
                 )
-                if right.length == 0:
+                if right.length.length == 0:
                     break
                 self.events[pos] = left
                 self[r_pos].append(right)
@@ -170,9 +172,10 @@ class Voice:
             for item in event.prefix:
                 if isinstance(item, NotationTupletBegin):
                     tuplet_opened = True
+            print(tuplet_pos, tuplet_length, tuplet_opened)
             if (tuplet_pos or tuplet_length or tuplet_opened):
-                # print(f"p_denom={p_denom}, l_denom={l_denom}")
-                # print(f"appending {event} to tuplet")
+                print(f"p_denom={p_denom}, l_denom={l_denom}")
+                print(f"appending {event} to tuplet")
                 if tuplet is None:
                     tuplet = Tuplet(Length(0))
                     new_events[position] = tuplet
@@ -183,7 +186,7 @@ class Voice:
                         tuplet = None
                 continue
             if tuplet is not None and not tuplet_length and not tuplet_pos:
-                # print(f"tuplet is complete: {tuplet}")
+                print(f"tuplet {tuplet} is complete")
                 tuplet = None
             # print(f"appending {event} to dict")
             new_events[position] = event

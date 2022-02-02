@@ -40,6 +40,7 @@ def test_notmalized() -> None:
     assert Fractured.closest_power_of_two(2) == 2
     assert Fractured.closest_power_of_two(4) == 4
     assert Fractured.closest_power_of_two(24) == 16
+    assert Fractured.closest_power_of_two(75) == 64
     assert Fractured.closest_power_of_two(int(8 / 3 * 2)) == 4
     assert Fractured.closest_power_of_two(int(16 / 5 * 2)) == 4
 
