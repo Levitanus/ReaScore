@@ -19,7 +19,6 @@ ROUND_QUARTERS = 4
 
 
 class Fractured:
-
     @property
     def fraction(self) -> Fraction:
         raise NotImplementedError()
@@ -102,9 +101,8 @@ class Fractured:
             other = other.fraction
         return self.fraction * other
 
-    def __truediv__(
-        self, other: ty.Union[Fraction, 'Fractured', int]
-    ) -> Fraction:
+    def __truediv__(self, other: ty.Union[Fraction, 'Fractured',
+                                          int]) -> Fraction:
         if isinstance(other, Fractured):
             other = other.fraction
         return self.fraction / other
@@ -124,13 +122,11 @@ class Fractured:
 
 
 class Position(Fractured):
-
-    def __init__(
-        self,
-        position_beats: ty.Optional[float] = None,
-        take_ppq_position: ty.Optional[ty.Tuple[rpr.Take, float]] = None,
-        position_sec: ty.Optional[float] = None
-    ) -> None:
+    def __init__(self,
+                 position_beats: ty.Optional[float] = None,
+                 take_ppq_position: ty.Optional[ty.Tuple[rpr.Take,
+                                                         float]] = None,
+                 position_sec: ty.Optional[float] = None) -> None:
         if position_beats is not None:
             self.position = round(position_beats, ROUND_QUARTERS)
         elif take_ppq_position is not None:
@@ -153,8 +149,8 @@ class Position(Fractured):
 
     @property
     def bar_position(self) -> Fraction:
-        return Fraction(self._bar_position / 4
-                        ).limit_denominator(LIMIT_DENOMINATOR)
+        return Fraction(self._bar_position /
+                        4).limit_denominator(LIMIT_DENOMINATOR)
 
     @property
     def bar_position_norm(self) -> ty.Tuple[Fraction, ...]:
@@ -162,8 +158,8 @@ class Position(Fractured):
 
     @property
     def bar_end_distance(self) -> Fraction:
-        return Fraction(self._bar_end_distance / 4
-                        ).limit_denominator(LIMIT_DENOMINATOR)
+        return Fraction(self._bar_end_distance /
+                        4).limit_denominator(LIMIT_DENOMINATOR)
 
     @property
     def bar_end_distance_qn(self) -> float:
@@ -171,8 +167,7 @@ class Position(Fractured):
 
     @staticmethod
     def _get_bar_position(
-        position_beats: float
-    ) -> ty.Tuple[int, float, float]:
+            position_beats: float) -> ty.Tuple[int, float, float]:
         (
             bar,
             m_start,
@@ -228,12 +223,10 @@ class Position(Fractured):
 
     def __repr__(self) -> str:
         return '<Position bar:{}, beat:{}, from start:{}>'.format(
-            self.bar, self.bar_position, self.position
-        )
+            self.bar, self.bar_position, self.position)
 
 
 class Length(Fractured):
-
     def __init__(self, length_in_beats: float, full_bar: bool = False) -> None:
         self.length = round(length_in_beats, ROUND_QUARTERS)
         self.full_bar = full_bar
@@ -251,7 +244,6 @@ class Length(Fractured):
 
 
 class Pitch:
-
     def __init__(
         self,
         midi_pitch: ty.Optional[int] = None,
@@ -275,8 +267,7 @@ class Pitch:
         if self.midi_pitch == PITCH_IS_CHORD:
             return 'PITCH_IS_CHORD'
         return '<Pitch midi:{}, {} (in c:major), tie={}>'.format(
-            self.midi_pitch, self.named_pitch(), self.tie
-        )
+            self.midi_pitch, self.named_pitch(), self.tie)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Pitch):
@@ -310,7 +301,6 @@ class Pitch:
 
 
 class Attachment:
-
     def ly_render(self) -> str:
         raise NotImplementedError()
 
@@ -335,14 +325,20 @@ class Clef(Attachment, Enum):
         return f'\\clef {self.value}'
 
 
-class NotationEvent:
+class TimeSignature(Attachment):
+    def __init__(self, numerator: int, denomenator: int) -> None:
+        self.numerator, self.denomenator = numerator, denomenator
 
+    def ly_render(self) -> str:
+        return f"\\time {self.numerator}/{self.denomenator}"
+
+
+class NotationEvent:
     def update(self, new: 'NotationEvent') -> bool:
         return False
 
 
 class NotationMarker(NotationEvent):
-
     def for_marker(self) -> str:
         raise NotImplementedError()
 
@@ -377,7 +373,6 @@ class NotationMarker(NotationEvent):
 
 
 class NotationKeySignature(NotationMarker, Attachment):
-
     def __init__(self, key: Key) -> None:
         self.key = key
 
@@ -399,8 +394,21 @@ class NotationKeySignature(NotationMarker, Attachment):
         return NotationKeySignature(Key(tonic, Scale(scale)))
 
 
-class NotationPitch(NotationEvent):
+class NotationTimeSignature(NotationEvent, Attachment):
+    def __init__(self, time_sig: TimeSignature) -> None:
+        self.time_sig = time_sig
 
+    def update(self, new: 'NotationEvent') -> bool:
+        if not isinstance(new, NotationTimeSignature):
+            return False
+        self.time_sig = new.time_sig
+        return True
+
+    def ly_render(self) -> str:
+        return self.time_sig.ly_render()
+
+
+class NotationPitch(NotationEvent):
     def __init__(self, pitch: Pitch) -> None:
         super().__init__()
         self.pitch = pitch
@@ -420,11 +428,8 @@ class NotationPitch(NotationEvent):
         if not isinstance(new, NotationPitch):
             return False
         if self.pitch != new.pitch:
-            warnings.warn(
-                'Pitches are not equal! {} replaced with {}'.format(
-                    self.pitch, new.pitch
-                )
-            )
+            warnings.warn('Pitches are not equal! {} replaced with {}'.format(
+                self.pitch, new.pitch))
         return True
 
     @classmethod
@@ -499,19 +504,16 @@ class NotationPitch(NotationEvent):
             if event.pitch is None:
                 raise ValueError("only pitched notation supported")
             if pitch != event.pitch:
-                raise ValueError(
-                    """Notations for different pitches has to \
-                    be packed separatelly."""
-                )
+                raise ValueError("""Notations for different pitches has to \
+                    be packed separatelly.""")
             pitch = event.pitch
         tokens_str = f" text ReaScore|{'|'.join(tokens)}"
         if original_buf:
             string = bytes(original_buf[2:]).decode('latin-1')
             original_tokens = '|'.join(cls.reascore_tokens(string))
             if original_tokens:
-                string = re.sub(
-                    f'text ReaScore|{original_tokens}', tokens_str, string
-                )
+                string = re.sub(f'text ReaScore|{original_tokens}', tokens_str,
+                                string)
             else:
                 string += tokens_str
         else:
@@ -524,7 +526,6 @@ class NotationPitch(NotationEvent):
 
 
 class Event:
-
     def __init__(
         self,
         length: Length,
@@ -534,13 +535,9 @@ class Event:
         prefix: ty.Optional[ty.List[Attachment]] = None,
         postfix: ty.Optional[ty.List[Attachment]] = None,
     ) -> None:
-        (
-            self.length, self.pitch, self.voice_nr, self.staff_nr, self.prefix,
-            self.postfix
-        ) = (
-            length, pitch, voice_nr, staff_nr, prefix if prefix else [],
-            postfix if postfix else []
-        )
+        (self.length, self.pitch, self.voice_nr, self.staff_nr, self.prefix,
+         self.postfix) = (length, pitch, voice_nr, staff_nr,
+                          prefix if prefix else [], postfix if postfix else [])
 
     @property
     def _params(
@@ -568,9 +565,7 @@ class Event:
         if self.length < at_length:
             raise ValueError(
                 'length of event ({}) shorter than argument ({})'.format(
-                    self.length, at_length
-                )
-            )
+                    self.length, at_length))
         left, right = deepcopy(self), deepcopy(self)
         left.length = at_length
         right.length = Length(self.length.length - at_length.length)
@@ -597,16 +592,15 @@ class Event:
 
 
 class Chord(Event):
-
     def __init__(
-        self,
-        length: Length,
-        pitch: ty.Optional[Pitch] = None,
-        voice_nr: int = 1,
-        staff_nr: int = 1,
-        prefix: ty.Optional[ty.List[Attachment]] = None,
-        postfix: ty.Optional[ty.List[Attachment]] = None,
-        pitches: ty.List[Pitch] = None,  # type:ignore
+            self,
+            length: Length,
+            pitch: ty.Optional[Pitch] = None,
+            voice_nr: int = 1,
+            staff_nr: int = 1,
+            prefix: ty.Optional[ty.List[Attachment]] = None,
+            postfix: ty.Optional[ty.List[Attachment]] = None,
+            pitches: ty.List[Pitch] = None,  # type:ignore
     ) -> None:
         super().__init__(
             length,
@@ -641,11 +635,8 @@ class Chord(Event):
 
     def append(self, event: Event) -> None:
         if event.length != self.length:
-            raise ValueError(
-                "event length mismatch: {} != {}".format(
-                    event.length, self.length
-                )
-            )
+            raise ValueError("event length mismatch: {} != {}".format(
+                event.length, self.length))
         if isinstance(event, Chord):
             self.pitches.extend(event.pitches)
         else:
@@ -653,7 +644,6 @@ class Chord(Event):
 
 
 class TupletRate:
-
     def __init__(self, numerator: int, denominator: int) -> None:
         self.numerator = numerator
         self.denominator = denominator
@@ -670,7 +660,6 @@ class TupletRate:
 
 
 class Tuplet(Event):
-
     def __init__(
         self,
         length: Length,
@@ -712,9 +701,8 @@ class Tuplet(Event):
             fraction = event.length.fraction
             real = (real + fraction).limit_denominator(LIMIT_DENOMINATOR)
             truncated += Fraction(
-                fraction.numerator /
-                Fractured.closest_power_of_two(fraction.denominator)
-            ).limit_denominator(LIMIT_DENOMINATOR)
+                fraction.numerator / Fractured.closest_power_of_two(
+                    fraction.denominator)).limit_denominator(LIMIT_DENOMINATOR)
         print(real, truncated)
         rate = Fraction(real / truncated).limit_denominator(LIMIT_DENOMINATOR)
         self._rate = TupletRate(rate.denominator, rate.numerator)
@@ -728,8 +716,7 @@ class Tuplet(Event):
             fraction = ev.length.fraction
             denom = Fractured.closest_power_of_two(fraction.denominator)
             ev.length = Length.from_fraction(
-                Fraction(fraction.numerator / denom)
-            )
+                Fraction(fraction.numerator / denom))
             out.append(ev)
         return out
 
@@ -742,7 +729,6 @@ class Tuplet(Event):
 
 
 class NotationAccidental(NotationPitch):
-
     def __init__(self, pitch: Pitch, accidental: Accidental) -> None:
         super().__init__(pitch)
         self.accidental = accidental
@@ -756,9 +742,8 @@ class NotationAccidental(NotationPitch):
 
     @classmethod
     def from_midi(cls, pitch: Pitch, string: str) -> 'NotationAccidental':
-        return NotationAccidental(
-            pitch, Accidental.from_str(string.split(':')[1])
-        )
+        return NotationAccidental(pitch,
+                                  Accidental.from_str(string.split(':')[1]))
 
     def update(self, new: NotationEvent) -> bool:
         if not isinstance(new, self.__class__):
@@ -769,12 +754,10 @@ class NotationAccidental(NotationPitch):
 
     def __repr__(self) -> str:
         return '<NotationAccidental {}, accidental:{}>'.format(
-            self.pitch, self.accidental.to_str()
-        )
+            self.pitch, self.accidental.to_str())
 
 
 class NotationVoice(NotationPitch):
-
     def __init__(self, pitch: Pitch, voice: int) -> None:
         super().__init__(pitch)
         self.voice = voice
@@ -802,7 +785,6 @@ class NotationVoice(NotationPitch):
 
 
 class NotationStaff(NotationPitch):
-
     def __init__(self, pitch: Pitch, staff: int) -> None:
         super().__init__(pitch)
         self.staff = staff
@@ -830,7 +812,6 @@ class NotationStaff(NotationPitch):
 
 
 class NotationClef(NotationPitch):
-
     def __init__(self, pitch: Pitch, clef: Clef) -> None:
         super().__init__(pitch)
         self.clef = clef
@@ -858,7 +839,6 @@ class NotationClef(NotationPitch):
 
 
 class NotationTupletBegin(NotationPitch, Attachment):
-
     def __init__(self, pitch: Pitch, rate: TupletRate) -> None:
         super().__init__(pitch)
         self.rate = rate
@@ -875,9 +855,8 @@ class NotationTupletBegin(NotationPitch, Attachment):
 
     @classmethod
     def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletBegin':
-        return NotationTupletBegin(
-            pitch, TupletRate.from_str(string.split(':')[1])
-        )
+        return NotationTupletBegin(pitch,
+                                   TupletRate.from_str(string.split(':')[1]))
 
     def update(self, new: NotationEvent) -> bool:
         if not isinstance(new, self.__class__):
@@ -891,7 +870,6 @@ class NotationTupletBegin(NotationPitch, Attachment):
 
 
 class NotationTupletEnd(NotationPitch, Attachment):
-
     def __init__(self, pitch: Pitch) -> None:
         super().__init__(pitch)
 
