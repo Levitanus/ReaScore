@@ -3,13 +3,16 @@ from warnings import warn
 from typing import Dict, List, NewType, Optional, Tuple, Union
 import re
 
+from rea_score.dom import EventT
+from rea_score.primitives import NotationKeySignature
+
 from .dom import Staff, Voice, events_from_take, split_by_voice
-from .primitives import Chord, Event, Key, Length, Pitch, Position, Scale, Tuplet
+from .primitives import Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position, Scale, Tuplet
 
 # import reapy as rpr
 # import abjad
 
-KEY = Key('fis', Scale.major)
+KEY = Key('c', Scale.major)
 
 
 def render_part(staves: List[Staff]) -> str:
@@ -38,6 +41,7 @@ def render_voice(
     name: Optional[str] = None
 ) -> str:
     # print(f"finalizing voice {voice}")
+    key = KEY
     voice = voice.finalized()
     args = {}
     if name:
@@ -47,25 +51,36 @@ def render_voice(
     out = []
     for event in voice.events.values():
         event_str = ''
-        event_str = render_any_event(event)
+        event_str, key = render_any_event(event, key)
         out.append(event_str)
-    key = KEY.ly_render()
-    return f"\\new Voice = \"{voice.voice_nr}\" {{\\{voice.voice_str} {key} {' '.join(out)}}}"
+    # key = KEY.ly_render()
+    return f"\\new Voice = \"{voice.voice_nr}\" {{\\{voice.voice_str} {' '.join(out)}}}"
 
 
-def render_any_event(event) -> str:
+def render_any_event(event: Union[Event, GlobalNotationEvent],
+                     key: Key) -> Tuple[str, Key]:
+    if isinstance(event, Event):
+        for attach in event.prefix:
+            if isinstance(attach, NotationKeySignature):
+                key = attach.key
+    print(event, key)
     if isinstance(event, Chord):
-        event_str = render_chord(event)
+        event_str = render_chord(event, key)
     elif isinstance(event, Tuplet):
-        event_str = render_tuplet(event)
+        event_str, key = render_tuplet(event, key)
     elif isinstance(event, Event):
-        event_str = render_event(event)
+        event_str = render_event(event, key)
+    elif isinstance(event, GlobalNotationEvent):
+        for ev in event.events:
+            if isinstance(ev, NotationKeySignature):
+                key = ev.key
+        event_str = event.ly_render()
     else:
         raise TypeError(event)
-    return event_str
+    return event_str, key
 
 
-def render_event(event: Event) -> str:
+def render_event(event: Event, key: Key) -> str:
     string = "{preambula}{pitch}{length}{notations}{tie}{tied}"
     if event.length == 0:
         warn(f'Zero-kength event: {event}, returning null')
@@ -73,7 +88,7 @@ def render_event(event: Event) -> str:
     length, tied = render_length(
         event.length, rest=(event.pitch.midi_pitch is None)
     )
-    pitch, tie = render_pitch(event.pitch)
+    pitch, tie = render_pitch(event.pitch, key)
     if event.length.full_bar:
         pitch = re.sub('r', 'R', pitch)
     # if tied and tie:
@@ -88,11 +103,11 @@ def render_event(event: Event) -> str:
     )
 
 
-def render_chord(chord: Chord) -> str:
+def render_chord(chord: Chord, key: Key) -> str:
     string = "{preambula}<{pitches}>{length}{notations}{tie}{tied}"
     pitches = []
     for pitch in chord.pitches:
-        pitches.append(''.join(render_pitch(pitch)))
+        pitches.append(''.join(render_pitch(pitch, key)))
     length, tied = render_length(chord.length)
     if tied:
         tie = '~'
@@ -108,13 +123,17 @@ def render_chord(chord: Chord) -> str:
     )
 
 
-def render_tuplet(tuplet: Tuplet) -> str:
+def render_tuplet(tuplet: Tuplet, key: Key) -> Tuple[str, Key]:
     string = "{prefix} \\tuplet {rate} {{{events}}}"
+    events_str = []
+    for event in tuplet.events:
+        event_str, key = render_any_event(event, key)
+        events_str.append(event_str)
     return string.format(
         prefix=render_prefix(tuplet),
         rate=tuplet.rate.to_str(),
-        events=' '.join(render_any_event(ev) for ev in tuplet.events)
-    )
+        events=' '.join(ev for ev in events_str)
+    ), key
 
 
 def render_prefix(event: Event) -> str:
@@ -158,8 +177,8 @@ def fraction_to_length(frac: Fraction) -> str:
     return denom + num
 
 
-def render_pitch(pitch: Pitch) -> Tuple[str, str]:
-    string = pitch.named_pitch(KEY)
+def render_pitch(pitch: Pitch, key: Key) -> Tuple[str, str]:
+    string = pitch.named_pitch(key)
     string = re.sub('♯', 'is', string)
     string = re.sub('♭', 'es', string)
     if m := re.match(r'(.+)(\d)', string):
@@ -172,7 +191,7 @@ def render_pitch(pitch: Pitch) -> Tuple[str, str]:
         else:
             octave = ''
     else:
-        name = pitch.named_pitch(KEY)
+        name = pitch.named_pitch(key)
         octave = ''
     if pitch.tie:
         tie = '~'

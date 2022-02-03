@@ -2,21 +2,22 @@ from copy import deepcopy
 from pathlib import Path
 
 from rea_score.lily_convert import render_part
-from rea_score.dom import split_by_staff
 
 import reapy as rpr
 from reapy import reascript_api as RPR
 from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
-from rea_score.primitives import (Clef, NotationAccidental, NotationClef,
-                                  NotationEvent, NotationKeySignature,
-                                  NotationPitch, NotationVoice, NotationStaff,
-                                  Pitch)
+from rea_score.primitives import (
+    Clef, NotationAccidental, NotationClef, NotationEvent,
+    NotationKeySignature, NotationPitch, NotationVoice, NotationStaff, Pitch
+)
 
 from rea_score.scale import Accidental
 
-from .dom import events_from_take, get_global_events, split_by_voice
+from .dom import (
+    events_from_take, get_global_events, split_by_staff, update_events
+)
 from .lily_convert import render_staff
 from .lily_export import render
 
@@ -24,6 +25,7 @@ EXT_SECTION = 'Levitanus_ReaScore'
 
 
 class ProjectInspector:
+
     def __init__(self, project: Optional[rpr.Project] = None) -> None:
         if project is None:
             self.project = rpr.Project()
@@ -67,6 +69,7 @@ class ProjectInspector:
 
 
 class TrackInspector:
+
     def __init__(self, track: Optional[Union[rpr.Track, str]] = None) -> None:
         if track is None:
             self.track = rpr.Project().selected_tracks[0]
@@ -79,17 +82,16 @@ class TrackInspector:
     def state(self,
               key: str,
               value: Optional[object] = None) -> Optional[object]:
-        state = self.track.project.get_ext_state(EXT_SECTION,
-                                                 self.guid,
-                                                 pickled=True)
+        state = self.track.project.get_ext_state(
+            EXT_SECTION, self.guid, pickled=True
+        )
         if not state:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
-            self.track.project.set_ext_state(EXT_SECTION,
-                                             self.guid,
-                                             state,
-                                             pickled=True)
+            self.track.project.set_ext_state(
+                EXT_SECTION, self.guid, state, pickled=True
+            )
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -98,15 +100,17 @@ class TrackInspector:
         if name := self.state('part_name'):
             return name  # type:ignore
         if rpr.show_message_box(
-                'Part name is not provided. Do You wish to use track name?',
-                'part name dialog', 'ok-cancel') == 'ok':
+            'Part name is not provided. Do You wish to use track name?',
+            'part name dialog', 'ok-cancel'
+        ) == 'ok':
             name = self.track.name
             self.state('part_name', name)
             return name
         else:
             try:
-                name = rpr.get_user_inputs('Please, provide part name:',
-                                           ['part name'])['part name']
+                name = rpr.get_user_inputs(
+                    'Please, provide part name:', ['part name']
+                )['part name']
                 self.state('part_name', name)
                 return name
             except RuntimeError:
@@ -131,10 +135,13 @@ class TrackInspector:
             events.update(events_from_take(item.active_take))
         global_events = get_global_events(
             ProjectInspector(self.track.project).notations_at_start(), begin,
-            end)
-        events.update(global_events)
+            end
+        )
+        # events = update_events(events, global_events)
         events = {k: events[k] for k in sorted(events)}
         staves = split_by_staff(events)
+        for staff in staves:
+            staff.apply_global_events(global_events)
         # print(staves)
         lily = render_part(staves)
         pdf = render(lily, export_path)
@@ -147,11 +154,15 @@ class TrackInspector:
 
 
 class NotationPitchInspector:
-    def set(self, take: rpr.Take, notes: List[rpr.Note],
-            events: List[NotationPitch]) -> None:
+
+    def set(
+        self, take: rpr.Take, notes: List[rpr.Note],
+        events: List[NotationPitch]
+    ) -> None:
         midi = take.get_midi()
         notations = list(
-            filter(lambda event: NotationPitch.is_reascore_event(event), midi))
+            filter(lambda event: NotationPitch.is_reascore_event(event), midi)
+        )
         for note in notes:
             infos = note.infos
             ppq = infos['ppq_position']
@@ -175,11 +186,14 @@ class NotationPitchInspector:
                         if old.update(new) is True:
                             updated_events.append(new)
                 parced.extend(
-                    filter(lambda event: event not in updated_events,
-                           note_events))
+                    filter(
+                        lambda event: event not in updated_events, note_events
+                    )
+                )
                 note_events = parced
-            buf = NotationPitch.to_midi_buf(note_events, Pitch(pitch),
-                                            original_buf)
+            buf = NotationPitch.to_midi_buf(
+                note_events, Pitch(pitch), original_buf
+            )
 
             event = rpr.MIDIEventDict(
                 ppq=ppq,
@@ -201,8 +215,10 @@ def set_accidental_for_selected_notes(accidental: Accidental) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(editor.take, list(selected),
-                                 [NotationAccidental(Pitch(127), accidental)])
+    NotationPitchInspector().set(
+        editor.take, list(selected),
+        [NotationAccidental(Pitch(127), accidental)]
+    )
 
 
 @rpr.inside_reaper()
@@ -213,8 +229,9 @@ def set_voice_of_selected_notes(voice: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(editor.take, list(selected),
-                                 [NotationVoice(Pitch(127), voice)])
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationVoice(Pitch(127), voice)]
+    )
 
 
 @rpr.inside_reaper()
@@ -225,8 +242,9 @@ def set_staff_of_selected_notes(staff: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(editor.take, list(selected),
-                                 [NotationStaff(Pitch(127), staff)])
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
+    )
 
 
 @rpr.inside_reaper()
@@ -237,5 +255,6 @@ def set_clef_of_selected_notes(clef: Clef) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))[0]
-    NotationPitchInspector().set(editor.take, [selected],
-                                 [NotationClef(Pitch(127), clef)])
+    NotationPitchInspector().set(
+        editor.take, [selected], [NotationClef(Pitch(127), clef)]
+    )

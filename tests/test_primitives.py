@@ -6,7 +6,7 @@ import rea_score.primitives as pr
 
 from copy import deepcopy
 
-from rea_score.scale import Accidental
+from rea_score.scale import Accidental, Key, Scale
 
 
 class FracturedConcrete(pr.Fractured):
@@ -96,6 +96,9 @@ def test_pitch() -> None:
     assert p2.named_pitch() == 'c4'
     p2.accidental = Accidental.is_
     assert p2.named_pitch() == 'b♯3'
+
+    p3 = pr.Pitch(63)
+    assert p3.named_pitch(Key('g', Scale.minor)) == 'e♭4'
 
     p3 = pr.Pitch(61, accidental=Accidental.es)
     p33 = pr.Pitch(61, accidental=Accidental.es)

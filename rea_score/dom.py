@@ -3,16 +3,20 @@ from typing import Dict, Iterable, Iterator, List, Optional, TypeVar, Union
 import reapy as rpr
 from reapy.core.item.midi_event import MIDIEventDict
 
-from .primitives import (Attachment, Chord, Clef, Event, Length,
-                         NotationMarker, NotationPitch, NotationEvent,
-                         NotationTimeSignature, NotationTupletBegin,
-                         NotationTupletEnd, Pitch, Position, Fractured,
-                         TimeSignature, Tuplet)
+from .primitives import (
+    Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
+    NotationMarker, NotationPitch, NotationEvent, NotationTimeSignature,
+    NotationTupletBegin, NotationTupletEnd, Pitch, Position, Fractured,
+    TimeSignature, Tuplet
+)
 
 from pprint import pformat, pprint
 
+EventT = TypeVar('EventT', NotationEvent, Event, covariant=True)
+
 
 class EventPackager:
+
     def __init__(self, voice: 'Voice', key: Position) -> None:
         self.voice = voice
         self.key = key
@@ -30,9 +34,9 @@ class EventPackager:
 
     def split_by_position(self, event: Event) -> None:
         if self.key.bar_end_distance < event.length:
-            left, append_part = event.split(Length(
-                float(self.key.bar_end_distance) * 4),
-                                            tie=True)
+            left, append_part = event.split(
+                Length(float(self.key.bar_end_distance) * 4), tie=True
+            )
         else:
             left = event
         parts = Fractured.normalized(self.key.bar_end_distance)
@@ -41,8 +45,9 @@ class EventPackager:
         for part in parts:
             if left.length <= part:
                 self.voice.events[current_pos] = left
-                current_pos = Position(current_pos.position +
-                                       left.length.length)
+                current_pos = Position(
+                    current_pos.position + left.length.length
+                )
                 break
             left, right = left.split(Length.from_fraction(part), tie=True)
             if right.length.length == 0:
@@ -59,9 +64,11 @@ class EventPackager:
 
 
 class Voice:
+
     def __init__(self, voice_nr: int = 1) -> None:
         self.voice_nr = voice_nr
         self.events: Dict[Position, Event] = {}
+        self.globals: Dict[Position, List[NotationEvent]] = {}
 
     @property
     def voice_str(self) -> str:
@@ -113,8 +120,9 @@ class Voice:
             except IndexError:
                 break
             if pos + ev.length > r_pos:
-                left, right = ev.split(Length(float(r_pos - pos) * 4),
-                                       tie=True)
+                left, right = ev.split(
+                    Length(float(r_pos - pos) * 4), tie=True
+                )
                 if right.length.length == 0:
                     break
                 self.events[pos] = left
@@ -128,24 +136,31 @@ class Voice:
         for position, event in sorted(self.events.items()):
             if position < last:
                 _last_pos = list(out.events)[-1]
-                raise ValueError("overlapping events found: {}, {}".format(
-                    (_last_pos, out.events[_last_pos]), (position, event)))
+                raise ValueError(
+                    "overlapping events found: {}, {}".format(
+                        (_last_pos, out.events[_last_pos]), (position, event)
+                    )
+                )
             if distance := position.percize_distance(last):
                 left, bars, right = distance
                 if left:
                     out[last].append(
-                        Event(left, Pitch(), voice_nr=self.voice_nr))
+                        Event(left, Pitch(), voice_nr=self.voice_nr)
+                    )
                 for bar_nr in range(bars):
                     bar = last.bar + bar_nr
                     bar_info = rpr.Project().measure_info(bar)
                     bar_pos = Position(bar_info['start'])
-                    bar_length = Length(bar_info['end'] - bar_info['start'],
-                                        full_bar=True)
+                    bar_length = Length(
+                        bar_info['end'] - bar_info['start'], full_bar=True
+                    )
                     out[bar_pos].append(
-                        Event(bar_length, Pitch(), voice_nr=self.voice_nr))
+                        Event(bar_length, Pitch(), voice_nr=self.voice_nr)
+                    )
                 if right:
                     out[Position(position.position - right.length)].append(
-                        Event(right, Pitch(), voice_nr=self.voice_nr))
+                        Event(right, Pitch(), voice_nr=self.voice_nr)
+                    )
             out[position].append(event)
             last = Position(position.position + event.length.length)
         return out
@@ -184,14 +199,38 @@ class Voice:
         self.events = new_events
         return self
 
+    def apply_global_events(
+        self,
+        global_events: Dict[Position, List[NotationEvent]],
+        forced: bool = False
+    ) -> 'Voice':
+        for position, events in global_events.items():
+            if position in self.events:
+                for event in events:
+                    event.apply_to_event(self.events[position])
+            else:
+                if position > max(self.events):
+                    continue
+                if not forced:
+                    self.globals[position] = events
+                else:
+                    self.events[position] = GlobalNotationEvent(events)
+        if forced:
+            self.events = {k: self.events[k] for k in sorted(self.events)}
+        return self
+
     def finalized(self) -> 'Voice':
         self.sort()
         with_rests = self.with_rests()
         with_tuples = with_rests.with_tuplets()
-        return with_tuples
+        with_globals = with_tuples.apply_global_events(
+            self.globals, forced=True
+        )
+        return with_globals
 
 
 class Staff:
+
     def __init__(self, staff_nr: int, clef: Optional[Clef] = None) -> None:
         self.staff_nr = staff_nr
         self.voices: List[Voice] = []
@@ -204,13 +243,21 @@ class Staff:
 
     def __repr__(self) -> str:
         return "<Staff {nr}, clef: {clef}, {voices}>".format(
-            nr=self.staff_nr, clef=self.clef.ly_render(), voices=self.voices)
+            nr=self.staff_nr, clef=self.clef.ly_render(), voices=self.voices
+        )
 
     def append(self, voice: Voice) -> None:
         self.voices.append(voice)
 
     def extend(self, voices: Iterable[Voice]) -> None:
         self.voices.extend(voices)
+
+    def apply_global_events(
+        self, global_events: Dict[Position, List[NotationEvent]]
+    ) -> None:
+        self.voices[0].apply_global_events(global_events)
+        for voice in self.voices:
+            voice.apply_global_events(global_events)
 
     def __getitem__(self, index: int) -> Voice:
         return self.voices[index]
@@ -227,8 +274,8 @@ class Staff:
 
 
 def get_time_signature_betveen_bounds(
-        begin_s: float,
-        end_s: float) -> Dict[Position, List[NotationTimeSignature]]:
+    begin_s: float, end_s: float
+) -> Dict[Position, List[NotationTimeSignature]]:
     times = {}
     pr = rpr.Project()
     i = 1
@@ -242,19 +289,18 @@ def get_time_signature_betveen_bounds(
             break
         if (num, denom) != (info['num'], info['denom']):
             num, denom = info['num'], info['denom']
-            times[Position(pr.time_to_beats(
-                info['start']))] = [TimeSignature(num, denom)]
+            times[Position(pr.time_to_beats(info['start']))] = [
+                NotationTimeSignature(TimeSignature(num, denom))
+            ]
         i += 1
     return times
 
 
-T = TypeVar('T')
-EventsDict = Dict[Position, List[T]]
-
-
-def update_events(events: EventsDict[T],
-                  update: EventsDict[T],
-                  sort: bool = False) -> EventsDict[T]:
+def update_events(
+    events: Dict[Position, List[EventT]],
+    update: Dict[Position, List[EventT]],
+    sort: bool = False
+) -> Dict[Position, List[EventT]]:
     events = events.copy()
     for pos, event in update.items():
         if pos in events:
@@ -266,18 +312,22 @@ def update_events(events: EventsDict[T],
     return events
 
 
-def get_global_events(at_start: List[NotationEvent], begin_s: float,
-                      end_s: float) -> Dict[Position, List[NotationEvent]]:
+def get_global_events(
+    at_start: List[NotationEvent], begin_s: float, end_s: float
+) -> Dict[Position, List[NotationEvent]]:
     events: Dict[Position, List[NotationEvent]] = {}
     events[Position(0)] = at_start
-    events = update_events(events,
-                           get_time_signature_betveen_bounds(begin_s, end_s))
+    events = update_events(
+        events, get_time_signature_betveen_bounds(begin_s, end_s)
+    )
     pr = rpr.Project()
     for marker in pr.markers:
         if NotationMarker.reascore_tokens(marker.name):
-            events[Position(pr.time_to_beats(marker.position))]
-
-    return events
+            pos = Position(pr.time_to_beats(marker.position))
+            if pos not in events:
+                events[pos] = []
+            events[pos].extend(NotationMarker.from_reaper_marker(marker.name))
+    return {k: events[k] for k in sorted(events)}
 
 
 def notes_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
@@ -298,7 +348,8 @@ def _filter_notations(event: MIDIEventDict) -> bool:
 
 
 def pitch_notations_from_take(
-        take: rpr.Take) -> Dict[Position, List[NotationPitch]]:
+    take: rpr.Take
+) -> Dict[Position, List[NotationPitch]]:
     events: Dict[Position, List[NotationPitch]] = {}
 
     for event in filter(_filter_notations, take.get_midi()):
@@ -364,6 +415,7 @@ def split_by_staff(events: Dict[Position, List[Event]]) -> List[Staff]:
 
 
 class BarCheck(Attachment):
+
     def __init__(self, bar_nr: Optional[int] = None) -> None:
         self.bar_nr = bar_nr
 
