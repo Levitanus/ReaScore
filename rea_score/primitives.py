@@ -337,12 +337,66 @@ class Clef(Attachment, Enum):
 
 class NotationEvent:
 
-    @property
-    def for_midi(self) -> str:
-        return 'test_notation'
+    def update(self, new: 'NotationEvent') -> bool:
+        return False
 
-    def update(self, new: 'NotationEvent') -> None:
-        pass
+
+class NotationMarker(NotationEvent):
+
+    def for_marker(self) -> str:
+        raise NotImplementedError()
+
+    @classmethod
+    def from_marker(cls, string: str) -> 'NotationMarker':
+        raise NotImplementedError()
+
+    @classmethod
+    def reascore_tokens(cls, string: str) -> ty.List[str]:
+        tokens = re.search(r'#ReaScore\s(\S+)', string)
+        if not tokens:
+            return []
+        return tokens.groups()[0].split('|')
+
+    @classmethod
+    def from_reaper_marker(cls, string: str) -> ty.List['NotationMarker']:
+        tokens = cls.reascore_tokens(string)
+        if not tokens:
+            return []
+        notations = []
+        for token in tokens:
+            if token.startswith('key'):
+                notations.append(NotationKeySignature.from_marker(token))
+        return notations
+
+    @classmethod
+    def to_reaper_marker(cls, events: ty.List['NotationMarker']) -> str:
+        tokens = []
+        for event in events:
+            tokens.append(event.for_marker())
+        return '#ReaScore {}'.format('|'.join(tokens))
+
+
+class NotationKeySignature(NotationMarker, Attachment):
+
+    def __init__(self, key: Key) -> None:
+        self.key = key
+
+    def update(self, new: 'NotationEvent') -> bool:
+        if not isinstance(new, NotationKeySignature):
+            return False
+        self.key = new.key
+        return True
+
+    def ly_render(self) -> str:
+        return self.key.ly_render()
+
+    def for_marker(self) -> str:
+        return f'key:{self.key.for_librosa}'
+
+    @classmethod
+    def from_marker(cls, string: str) -> 'NotationKeySignature':
+        _, tonic, scale = string.split(':')
+        return NotationKeySignature(Key(tonic, Scale(scale)))
 
 
 class NotationPitch(NotationEvent):
@@ -350,6 +404,14 @@ class NotationPitch(NotationEvent):
     def __init__(self, pitch: Pitch) -> None:
         super().__init__()
         self.pitch = pitch
+
+    @property
+    def for_midi(self) -> str:
+        raise NotImplementedError()
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationPitch':
+        raise NotImplementedError()
 
     def apply_to_event(self, event: 'Event') -> None:
         pass

@@ -10,8 +10,8 @@ from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    Clef, NotationAccidental, NotationClef, NotationEvent, NotationPitch,
-    NotationVoice, NotationStaff, Pitch
+    Clef, NotationAccidental, NotationClef, NotationEvent,
+    NotationKeySignature, NotationPitch, NotationVoice, NotationStaff, Pitch
 )
 
 from rea_score.scale import Accidental
@@ -59,6 +59,12 @@ class ProjectInspector:
             return path.parent.joinpath('temp.pdf')
         else:
             return path.joinpath('temp.pdf')
+
+    def notations_at_start(self) -> List[NotationEvent]:
+        notations: List[NotationEvent] = []
+        if ks := cast(str, self.state('key_signature')):
+            notations.append(NotationKeySignature.from_marker(ks))
+        return notations
 
 
 class TrackInspector:
@@ -117,8 +123,19 @@ class TrackInspector:
     def render(self) -> None:
         events = {}
         export_path = self.export_path
+        begin, end = self.track.project.length, .0
         for item in self.track.items:
+            i_pos = item.position
+            if begin > i_pos:
+                begin = i_pos
+            i_end = i_pos + item.length
+            if end < i_end:
+                end = i_end
             events.update(events_from_take(item.active_take))
+        global_events = get_global_events(
+            ProjectInspector(self.track.project).notations_at_start(), begin,
+            end
+        )
         staves = split_by_staff(events)
         # print(staves)
         lily = render_part(staves)

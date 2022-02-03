@@ -238,6 +238,11 @@ class Staff:
             yield voice
 
 
+def get_global_events(begin_s: float,
+                      end_s: float) -> Dict[Position, NotationEvent]:
+    ...
+
+
 def notes_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
     events: Dict[Position, List[Event]] = {}
     for note in take.notes:
