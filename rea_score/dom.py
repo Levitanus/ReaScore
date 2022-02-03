@@ -172,7 +172,7 @@ class Voice:
             for item in event.prefix:
                 if isinstance(item, NotationTupletBegin):
                     tuplet_opened = True
-            print(tuplet_pos, tuplet_length, tuplet_opened)
+            # print(tuplet_pos, tuplet_length, tuplet_opened)
             if (tuplet_pos or tuplet_length or tuplet_opened):
                 print(f"p_denom={p_denom}, l_denom={l_denom}")
                 print(f"appending {event} to tuplet")

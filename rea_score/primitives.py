@@ -12,10 +12,10 @@ from reapy.core.item.midi_event import MIDIEventDict
 
 from .scale import Accidental, ENHARM_ACC, Scale, midi_to_note, Key
 
-LIMIT_DENOMINATOR = 96
+LIMIT_DENOMINATOR = 128
 PITCH_IS_CHORD = 12800
 PITCH_IS_TUPLET = 12801
-ROUND_QUARTERS = 3
+ROUND_QUARTERS = 4
 
 
 class Fractured:
@@ -645,13 +645,15 @@ class Tuplet(Event):
 
     @property
     def rate(self) -> TupletRate:
-        real, truncated = 0, 0
+        real, truncated = Fraction(0), Fraction(0)
         for event in self._events:
             fraction = event.length.fraction
-            real += float(fraction)
-            truncated += fraction.numerator / Fractured.closest_power_of_two(
-                fraction.denominator
-            )
+            real = (real + fraction).limit_denominator(LIMIT_DENOMINATOR)
+            truncated += Fraction(
+                fraction.numerator /
+                Fractured.closest_power_of_two(fraction.denominator)
+            ).limit_denominator(LIMIT_DENOMINATOR)
+        print(real, truncated)
         rate = Fraction(real / truncated).limit_denominator(LIMIT_DENOMINATOR)
         self._rate = TupletRate(rate.denominator, rate.numerator)
         return self._rate
