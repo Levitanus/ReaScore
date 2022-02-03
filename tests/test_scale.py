@@ -1,6 +1,11 @@
 from rea_score import scale as sc
 
 
+def test_scale() -> None:
+    assert sc.Scale('major') == sc.Scale.major
+    assert sc.Scale('minor') == sc.Scale.minor
+
+
 def test_accidental() -> None:
     assert sc.Accidental.from_str('isis') == sc.Accidental.isis
     assert sc.Accidental.from_str('♯') == sc.Accidental.is_

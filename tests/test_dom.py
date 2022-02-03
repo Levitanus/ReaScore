@@ -12,6 +12,7 @@ def test_event_packager():
     assert position.bar_end_distance < event.length
     EventPackager(voice, position).append(event)
     # pprint(voice.events)
+    voice.events = {k: voice.events[k] for k in sorted(voice.events)}
     expected_events = {
         Position.from_fraction(3 / 8):
             Event(Length.from_fraction(1 / 8), Pitch(60, tie=True)),
