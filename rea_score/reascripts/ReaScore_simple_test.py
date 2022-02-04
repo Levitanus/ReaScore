@@ -1,8 +1,11 @@
 import reapy as rpr
+
+import reapy as rpr
 from reapy import reascript_api as RPR
 from rea_score.primitives import Position
 from pprint import pprint
 from reapy import reascript_api as RPR
+from reapy import ImGui
 
 take = rpr.Project().selected_items[0].active_take
 midi = take.get_midi()

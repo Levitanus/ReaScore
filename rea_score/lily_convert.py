@@ -3,11 +3,14 @@ from warnings import warn
 from typing import Dict, List, NewType, Optional, Tuple, Union
 import re
 
-from rea_score.dom import EventT
+from rea_score.dom import EventT, TrackType
 from rea_score.primitives import NotationKeySignature
 
 from .dom import Staff, Voice, events_from_take, split_by_voice
-from .primitives import Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position, Scale, Tuplet
+from .primitives import (
+    Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position, Scale,
+    Tuplet, Clef
+)
 
 # import reapy as rpr
 # import abjad
@@ -15,35 +18,52 @@ from .primitives import Chord, Event, GlobalNotationEvent, Key, Length, Pitch, P
 KEY = Key('c', Scale.major)
 
 
-def render_part(staves: List[Staff]) -> str:
+def render_part(staves: List[Staff], track_type: TrackType) -> str:
     if len(staves) == 1:
-        return render_staff(staves[0])
+        return render_staff(staves[0], track_type)
     group = 'GrandStaff'
     part_string = """\\new {group} <<{staves}>>"""
     return part_string.format(
-        group=group, staves='\n'.join(render_staff(staff) for staff in staves)
+        group=group,
+        staves='\n'.join(render_staff(staff, track_type) for staff in staves)
     )
 
 
-def render_staff(staff: Staff) -> str:
-    staff_string = """\\new Staff <<{clef} {voices}>>"""
+def render_staff(staff: Staff, track_type: TrackType) -> str:
+    staff_string = """\\new {staff_str} <<{clef} {voices}>>"""
+    staff_str = 'Staff'
+    if track_type == TrackType.drums:
+        staff_str = 'DrumStaff'
+        staff.clef = Clef.percussion
     rendered_voices = []
     for voice in staff:
-        rendered_voices.append(render_voice(voice, voice.voice_nr))
+        rendered_voices.append(
+            render_voice(voice, voice.voice_nr, track_type=track_type)
+        )
     return staff_string.format(
-        clef=staff.clef.ly_render(), voices='\n'.join(rendered_voices)
+        staff_str=staff_str,
+        clef=staff.clef.ly_render(),
+        voices='\n'.join(rendered_voices)
     )
 
 
 def render_voice(
     voice: Voice,
     index: Optional[int] = None,
-    name: Optional[str] = None
+    name: Optional[str] = None,
+    track_type: TrackType = TrackType.default,
 ) -> str:
     # print(f"finalizing voice {voice}")
     key = KEY
     voice = voice.finalized()
     args = {}
+    voice_str = voice.voice_str
+    voicedef = 'Voice'
+    mode = ''
+    if track_type == TrackType.drums:
+        voice_str = 'stemUp' if index == 1 else 'stemDown'
+        voicedef = 'DrumVoice'
+        mode = '\\drummode'
     if name:
         if index:
             name = f'{name}index'
@@ -54,7 +74,13 @@ def render_voice(
         event_str, key = render_any_event(event, key)
         out.append(event_str)
     # key = KEY.ly_render()
-    return f"\\new Voice = \"{voice.voice_nr}\" {{\\{voice.voice_str} {' '.join(out)}}}"
+    return "\\new {voicedef} = \"{idx}\" {mode} {{\\{voicestr} {voiceout}}}".format(
+        voicedef=voicedef,
+        idx=index,
+        mode=mode,
+        voicestr=voice_str,
+        voiceout=' '.join(out)
+    )
 
 
 def render_any_event(event: Union[Event, GlobalNotationEvent],

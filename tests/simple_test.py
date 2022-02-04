@@ -1,8 +1,3 @@
-# from fractions import Fraction
+from rea_score.inspector import TrackInspector, TrackPitchType
 
-# quarter = Fraction(1 / 4)
-
-# eight = Fraction(1 / 8)
-# print(quarter / 3)
-
-# assert quarter ==
+TrackInspector().pitch_type = TrackPitchType.note_names

@@ -1,3 +1,4 @@
+from enum import Enum
 import re
 from typing import Dict, Iterable, Iterator, List, Optional, TypeVar, Union
 import reapy as rpr
@@ -13,6 +14,16 @@ from .primitives import (
 from pprint import pformat, pprint
 
 EventT = TypeVar('EventT', NotationEvent, Event, covariant=True)
+
+
+class TrackPitchType(Enum):
+    default = 'default'
+    note_names = 'note_names'
+
+
+class TrackType(Enum):
+    default = 'default'
+    drums = 'drums'
 
 
 class EventPackager:
@@ -278,21 +289,22 @@ def get_time_signature_betveen_bounds(
 ) -> Dict[Position, List[NotationTimeSignature]]:
     times = {}
     pr = rpr.Project()
-    i = 1
+    i = 0
     num = 0
     denom = 0
     while True:
+        i += 1
         info = pr.measure_info(i)
-        if info['start'] < begin_s:
+        # print(info)
+        if info['start'] < begin_s and info['start'] != 0:
             continue
-        if info['start'] > end_s or info['end'] == end_s:
+        if info['start'] > end_s or info['end'] >= end_s:
             break
         if (num, denom) != (info['num'], info['denom']):
             num, denom = info['num'], info['denom']
-            times[Position(pr.time_to_beats(info['start']))] = [
+            times[Position(info['start'])] = [
                 NotationTimeSignature(TimeSignature(num, denom))
             ]
-        i += 1
     return times
 
 
@@ -315,6 +327,7 @@ def update_events(
 def get_global_events(
     at_start: List[NotationEvent], begin_s: float, end_s: float
 ) -> Dict[Position, List[NotationEvent]]:
+    # print('get global events')
     events: Dict[Position, List[NotationEvent]] = {}
     events[Position(0)] = at_start
     events = update_events(
@@ -322,6 +335,7 @@ def get_global_events(
     )
     pr = rpr.Project()
     for marker in pr.markers:
+        # print(f'resolving marker {marker.name}')
         if NotationMarker.reascore_tokens(marker.name):
             pos = Position(pr.time_to_beats(marker.position))
             if pos not in events:
@@ -330,16 +344,24 @@ def get_global_events(
     return {k: events[k] for k in sorted(events)}
 
 
-def notes_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
+def notes_from_take(
+    take: rpr.Take, pitch_type: TrackPitchType, note_names: List[str]
+) -> Dict[Position, List[Event]]:
     events: Dict[Position, List[Event]] = {}
     for note in take.notes:
         info = note.infos
+        if pitch_type == TrackPitchType.note_names:
+            if not note_names[info['pitch']]:
+                continue
+            pitch = Pitch(info['pitch'], note_name=note_names[info['pitch']])
+        else:
+            pitch = Pitch(info['pitch'])
         start = take.ppq_to_beat(info['ppq_position'])
         end = take.ppq_to_beat(info['ppq_end'])
         pos = Position(start)
         if pos not in events:
             events[pos] = []
-        events[pos].append(Event(Length(end - start), Pitch(info['pitch'], )))
+        events[pos].append(Event(Length(end - start), pitch))
     return events
 
 
@@ -362,9 +384,11 @@ def pitch_notations_from_take(
 
 
 @rpr.inside_reaper()
-def events_from_take(take: rpr.Take) -> Dict[Position, List[Event]]:
+def events_from_take(
+    take: rpr.Take, pitch_type: TrackPitchType, note_names: List[str]
+) -> Dict[Position, List[Event]]:
     # events: Dict[Position, List[Event]] = {}
-    note_events = notes_from_take(take)
+    note_events = notes_from_take(take, pitch_type, note_names)
     pitch_notations = pitch_notations_from_take(take)
     for pos, notes in note_events.items():
         for note in notes:

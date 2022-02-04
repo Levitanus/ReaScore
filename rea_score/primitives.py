@@ -257,16 +257,20 @@ class Pitch:
         midi_pitch: ty.Optional[int] = None,
         accidental: ty.Optional[Accidental] = None,
         tie: bool = False,
+        note_name: str = '',
     ) -> None:
         self.midi_pitch = midi_pitch
         self.accidental = accidental
         self.tie = tie
+        self.note_name = note_name
 
     def named_pitch(self, key: Key = Key('C', Scale.major)) -> str:
         if self.midi_pitch is None:
             return 'r'
         if self.midi_pitch == PITCH_IS_CHORD:
             return 'PITCH_IS_CHORD'
+        if self.note_name:
+            return self.note_name
         return midi_to_note(self.midi_pitch, key, self.accidental)
 
     def __repr__(self) -> str:
@@ -486,6 +490,8 @@ class NotationPitch(NotationEvent):
             return NotationStaff.from_midi(pitch, token)
         if token.startswith('clef'):
             return NotationClef.from_midi(pitch, token)
+        if token.startswith('ghost'):
+            return NotationGhost.from_midi(pitch, token)
         return None
 
     @classmethod
@@ -897,6 +903,34 @@ class NotationClef(NotationPitch):
 
     def __repr__(self) -> str:
         return f'<NotationClef {self.pitch}, clef:{self.clef}>'
+
+
+class NotationGhost(NotationPitch, Attachment):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return '\\parenthesize'
+
+    @property
+    def for_midi(self) -> str:
+        return f'ghost'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationGhost':
+        return NotationGhost(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationGhost {self.pitch}>'
 
 
 class NotationTupletBegin(NotationPitch, Attachment):

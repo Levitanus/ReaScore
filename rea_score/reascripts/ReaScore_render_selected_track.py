@@ -1,4 +1,7 @@
+# print('import reapy as rpr')
 import reapy as rpr
+
+# print('import rea_score.inspector as it')
 import rea_score.inspector as it
 
 
@@ -8,5 +11,6 @@ def render_selected_track() -> None:
     it.TrackInspector().render()
 
 
+# print('render')
 render_selected_track()
 # print("end")

@@ -1,4 +1,5 @@
 from copy import deepcopy
+from enum import Enum
 from pathlib import Path
 
 from rea_score.lily_convert import render_part
@@ -9,14 +10,15 @@ from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    Clef, NotationAccidental, NotationClef, NotationEvent,
+    Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
     NotationKeySignature, NotationPitch, NotationVoice, NotationStaff, Pitch
 )
 
 from rea_score.scale import Accidental
 
 from .dom import (
-    events_from_take, get_global_events, split_by_staff, update_events
+    events_from_take, get_global_events, split_by_staff, update_events,
+    TrackPitchType, TrackType
 )
 from .lily_convert import render_staff
 from .lily_export import render
@@ -50,6 +52,9 @@ class ProjectInspector:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
+            self.project.set_ext_state(
+                EXT_SECTION, 'main', state, pickled=True
+            )
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -62,10 +67,20 @@ class ProjectInspector:
             return path.joinpath('temp.pdf')
 
     def notations_at_start(self) -> List[NotationEvent]:
+        print('notations at start')
         notations: List[NotationEvent] = []
         if ks := cast(str, self.state('key_signature')):
             notations.append(NotationKeySignature.from_marker(ks))
         return notations
+
+    def perform_shortcut(self, char: str) -> None:
+        func = self.state(f'shortcut:{char}')
+        print(char, func)
+        if func:
+            eval(func)
+
+    def set_shortcut(self, char: str, func: str) -> None:
+        self.state(f'shortcut:{char}', func)
 
 
 class TrackInspector:
@@ -96,6 +111,28 @@ class TrackInspector:
         return None if key not in state else state[key]  # type:ignore
 
     @property
+    def pitch_type(self) -> TrackPitchType:
+        pt = self.state('pitch_type')
+        if pt is None:
+            return TrackPitchType.default
+        return TrackPitchType(pt)
+
+    @pitch_type.setter
+    def pitch_type(self, pt: TrackPitchType) -> None:
+        self.state('pitch_type', pt.value)
+
+    @property
+    def track_type(self) -> TrackType:
+        pt = self.state('track_type')
+        if pt is None:
+            return TrackType.default
+        return TrackType(pt)
+
+    @track_type.setter
+    def track_type(self, pt: TrackType) -> None:
+        self.state('track_type', pt.value)
+
+    @property
     def part_name(self) -> str:
         if name := self.state('part_name'):
             return name  # type:ignore
@@ -108,9 +145,11 @@ class TrackInspector:
             return name
         else:
             try:
+                # print('getting part name')
                 name = rpr.get_user_inputs(
                     'Please, provide part name:', ['part name']
                 )['part name']
+                # print(f'got {name}')
                 self.state('part_name', name)
                 return name
             except RuntimeError:
@@ -125,6 +164,10 @@ class TrackInspector:
         events = {}
         export_path = self.export_path
         begin, end = self.track.project.length, .0
+        pitch_type = self.pitch_type
+        note_names = []
+        if pitch_type == TrackPitchType.note_names:
+            note_names = self.track.midi_note_names
         for item in self.track.items:
             i_pos = item.position
             if begin > i_pos:
@@ -132,18 +175,25 @@ class TrackInspector:
             i_end = i_pos + item.length
             if end < i_end:
                 end = i_end
-            events.update(events_from_take(item.active_take))
+            # print(f'update events by {item}')
+            events.update(
+                events_from_take(item.active_take, pitch_type, note_names)
+            )
+        # print('getting global events')
         global_events = get_global_events(
             ProjectInspector(self.track.project).notations_at_start(), begin,
             end
         )
         # events = update_events(events, global_events)
         events = {k: events[k] for k in sorted(events)}
+        # print('sort staves')
         staves = split_by_staff(events)
         for staff in staves:
+            # print(f'apply global events to staff {staff.staff_nr}')
             staff.apply_global_events(global_events)
         # print(staves)
-        lily = render_part(staves)
+        # print('render part')
+        lily = render_part(staves, self.track_type)
         pdf = render(lily, export_path)
         # while not pdf.exists():
         #     ...
@@ -257,4 +307,17 @@ def set_clef_of_selected_notes(clef: Clef) -> None:
     selected = list(filter(lambda note: note.selected, notes))[0]
     NotationPitchInspector().set(
         editor.take, [selected], [NotationClef(Pitch(127), clef)]
+    )
+
+
+@rpr.inside_reaper()
+def set_selected_notes_as_ghost() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationGhost(Pitch(127))]
     )

@@ -1,0 +1,3 @@
+from rea_score.inspector import set_selected_notes_as_ghost
+
+set_selected_notes_as_ghost()
