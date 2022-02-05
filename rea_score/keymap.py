@@ -1,9 +1,9 @@
 keymap = {
     # voices
-    "1": 'set_voice_for_selected_notes(1)',
-    "2": 'set_voice_for_selected_notes(2)',
-    "3": 'set_voice_for_selected_notes(3)',
-    "4": 'set_voice_for_selected_notes(4)',
+    "1": 'set_voice_of_selected_notes(1)',
+    "2": 'set_voice_of_selected_notes(2)',
+    "3": 'set_voice_of_selected_notes(3)',
+    "4": 'set_voice_of_selected_notes(4)',
     # staves
     "[": 'set_staff_of_selected_notes(1)',
     "]": 'set_staff_of_selected_notes(2)',
@@ -21,7 +21,9 @@ keymap = {
     # misc
     '0': 'set_selected_notes_as_ghost()',
     'r': 'TrackInspector().render()',
-    's': 'spread_notes()'
+    's': 'spread_notes()',
+    'v': 'view_score()',
+    'c': 'combine_items()',
 }
 
 funcmap = {v: k for k, v in keymap.items()}
