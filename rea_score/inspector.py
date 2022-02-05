@@ -2,6 +2,8 @@ from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 
+from reapy.core.reaper.reaper import perform_action
+
 from rea_score.lily_convert import render_part
 
 import reapy as rpr
@@ -9,26 +11,24 @@ from reapy import reascript_api as RPR
 from typing import List, Optional, Union, cast
 
 from reapy.core.item.midi_event import CCShapeFlag
-from rea_score.primitives import (
-    Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
-    NotationKeySignature, NotationMarker, NotationPitch, NotationVoice,
-    NotationStaff, Pitch
-)
+from rea_score.primitives import (Clef, NotationAccidental, NotationClef,
+                                  NotationEvent, NotationGhost,
+                                  NotationKeySignature, NotationMarker,
+                                  NotationPitch, NotationVoice, NotationStaff,
+                                  Pitch)
 
 from rea_score.scale import Accidental, Key, Scale
 
-from .dom import (
-    events_from_take, get_global_events, split_by_staff, update_events,
-    TrackPitchType, TrackType
-)
+from .dom import (events_from_take, get_global_events, split_by_staff,
+                  update_events, TrackPitchType, TrackType)
 from .lily_convert import render_staff
 from .lily_export import render
+from .keymap import keymap
 
 EXT_SECTION = 'Levitanus_ReaScore'
 
 
 class ProjectInspector:
-
     def __init__(self, project: Optional[rpr.Project] = None) -> None:
         if project is None:
             self.project = rpr.Project()
@@ -53,9 +53,10 @@ class ProjectInspector:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
-            self.project.set_ext_state(
-                EXT_SECTION, 'main', state, pickled=True
-            )
+            self.project.set_ext_state(EXT_SECTION,
+                                       'main',
+                                       state,
+                                       pickled=True)
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -90,17 +91,49 @@ class ProjectInspector:
         return self.project.add_marker(pos, name, (0, 255, 0))
 
     def perform_shortcut(self, char: str) -> None:
-        func = self.state(f'shortcut:{char}')
+        if char in keymap:
+            func = keymap[char]
+        else:
+            func = ''
         print(char, func)
         if func:
-            eval(func)
+            self.perform_func(func)
 
-    def set_shortcut(self, char: str, func: str) -> None:
-        self.state(f'shortcut:{char}', func)
+    @staticmethod
+    def perform_func(func: str) -> None:
+        eval(func)
+
+    @property
+    def score_tracks(self) -> List[rpr.Track]:
+        pr_tracks = cast(Optional[List[str]], self.state('tracks')) or []
+        tracks = []
+        for track_id in pr_tracks:
+            try:
+                track = rpr.Track.from_GUID(track_id, self.project)
+                tracks.append(track)
+            except KeyError:
+                continue
+        return tracks
+
+    def score_track_add(self, track: rpr.Track) -> None:
+        pr_tracks = [tr.GUID for tr in self.score_tracks]
+        if track.GUID in pr_tracks:
+            return
+        pr_tracks.append(track.GUID)
+        self.state('tracks', pr_tracks)
+
+    def score_track_remove(self, track: rpr.Track) -> None:
+        pr_tracks = [tr.GUID for tr in self.score_tracks]
+        if track.GUID not in pr_tracks:
+            return
+        pr_tracks.remove(track.GUID)
+        self.state('tracks', pr_tracks)
+
+    # def set_shortcut(self, char: str, func: str) -> None:
+    #     self.state(f'shortcut:{char}', func)
 
 
 class TrackInspector:
-
     def __init__(self, track: Optional[Union[rpr.Track, str]] = None) -> None:
         if track is None:
             self.track = rpr.Project().selected_tracks[0]
@@ -113,16 +146,17 @@ class TrackInspector:
     def state(self,
               key: str,
               value: Optional[object] = None) -> Optional[object]:
-        state = self.track.project.get_ext_state(
-            EXT_SECTION, self.guid, pickled=True
-        )
+        state = self.track.project.get_ext_state(EXT_SECTION,
+                                                 self.guid,
+                                                 pickled=True)
         if not state:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
-            self.track.project.set_ext_state(
-                EXT_SECTION, self.guid, state, pickled=True
-            )
+            self.track.project.set_ext_state(EXT_SECTION,
+                                             self.guid,
+                                             state,
+                                             pickled=True)
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -153,23 +187,21 @@ class TrackInspector:
         if name := self.state('part_name'):
             return name  # type:ignore
         if rpr.show_message_box(
-            'Part name is not provided. Do You wish to use track name?',
-            'part name dialog', 'ok-cancel'
-        ) == 'ok':
+                'Part name is not provided. Do You wish to use track name?',
+                'part name dialog', 'ok-cancel') == 'ok':
             name = self.track.name
             self.state('part_name', name)
             return name
         else:
-            try:
-                # print('getting part name')
-                name = rpr.get_user_inputs(
-                    'Please, provide part name:', ['part name']
-                )['part name']
-                # print(f'got {name}')
-                self.state('part_name', name)
-                return name
-            except RuntimeError:
-                exit()
+            # try:
+            # print('getting part name')
+            name = rpr.get_user_inputs('Please, provide part name:',
+                                       ['part name'])['part name']
+            # print(f'got {name}')
+            self.state('part_name', name)
+            return name
+            # except RuntimeError:
+            #     exit()
 
     @property
     def export_path(self) -> Path:
@@ -177,6 +209,7 @@ class TrackInspector:
         return dir_.joinpath(f"{self.part_name}.ly")
 
     def render(self) -> None:
+        ProjectInspector(self.track.project).score_track_add(self.track)
         events = {}
         export_path = self.export_path
         begin, end = self.track.project.length, .0
@@ -193,13 +226,11 @@ class TrackInspector:
                 end = i_end
             # print(f'update events by {item}')
             events.update(
-                events_from_take(item.active_take, pitch_type, note_names)
-            )
+                events_from_take(item.active_take, pitch_type, note_names))
         # print('getting global events')
         global_events = get_global_events(
             ProjectInspector(self.track.project).notations_at_start(), begin,
-            end
-        )
+            end)
         # events = update_events(events, global_events)
         events = {k: events[k] for k in sorted(events)}
         # print('sort staves')
@@ -220,15 +251,11 @@ class TrackInspector:
 
 
 class NotationPitchInspector:
-
-    def set(
-        self, take: rpr.Take, notes: List[rpr.Note],
-        events: List[NotationPitch]
-    ) -> None:
+    def set(self, take: rpr.Take, notes: List[rpr.Note],
+            events: List[NotationPitch]) -> None:
         midi = take.get_midi()
         notations = list(
-            filter(lambda event: NotationPitch.is_reascore_event(event), midi)
-        )
+            filter(lambda event: NotationPitch.is_reascore_event(event), midi))
         for note in notes:
             infos = note.infos
             ppq = infos['ppq_position']
@@ -252,14 +279,11 @@ class NotationPitchInspector:
                         if old.update(new) is True:
                             updated_events.append(new)
                 parced.extend(
-                    filter(
-                        lambda event: event not in updated_events, note_events
-                    )
-                )
+                    filter(lambda event: event not in updated_events,
+                           note_events))
                 note_events = parced
-            buf = NotationPitch.to_midi_buf(
-                note_events, Pitch(pitch), original_buf
-            )
+            buf = NotationPitch.to_midi_buf(note_events, Pitch(pitch),
+                                            original_buf)
 
             event = rpr.MIDIEventDict(
                 ppq=ppq,
@@ -281,10 +305,8 @@ def set_accidental_for_selected_notes(accidental: Accidental) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected),
-        [NotationAccidental(Pitch(127), accidental)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationAccidental(Pitch(127), accidental)])
 
 
 @rpr.inside_reaper()
@@ -295,9 +317,8 @@ def set_voice_of_selected_notes(voice: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationVoice(Pitch(127), voice)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationVoice(Pitch(127), voice)])
 
 
 @rpr.inside_reaper()
@@ -308,9 +329,8 @@ def set_staff_of_selected_notes(staff: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationStaff(Pitch(127), staff)])
 
 
 @rpr.inside_reaper()
@@ -321,9 +341,8 @@ def set_clef_of_selected_notes(clef: Clef) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))[0]
-    NotationPitchInspector().set(
-        editor.take, [selected], [NotationClef(Pitch(127), clef)]
-    )
+    NotationPitchInspector().set(editor.take, [selected],
+                                 [NotationClef(Pitch(127), clef)])
 
 
 @rpr.inside_reaper()
@@ -334,6 +353,12 @@ def set_selected_notes_as_ghost() -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationGhost(Pitch(127))]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationGhost(Pitch(127))])
+
+
+@rpr.inside_reaper()
+def spread_notes() -> None:
+    aid = rpr.get_command_id("_RS7cecccb7cf0502b9821cfca8cbc8a621578c2293")
+    if aid:
+        rpr, perform_action(aid)

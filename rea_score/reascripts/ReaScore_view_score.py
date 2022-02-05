@@ -51,14 +51,12 @@ def get_open_command(filepath):
         opener = 'open'
     else:
         opener = 'xdg-open'
-    return '{opener} {filepath}'.format(
-        opener=opener, filepath=f"'{filepath}'"
-    )
+    return '{opener} {filepath}'.format(opener=opener,
+                                        filepath=f"'{filepath}'")
 
 
 filepath = it.ProjectInspector().temp_pdf
 if not filepath.exists():
     rpr.show_message_box("can't open temp pdf. Render something at first.")
-    exit()
-
-Popen(get_open_command(filepath), stdout=PIPE, stderr=PIPE, shell=True)
+else:
+    Popen(get_open_command(filepath), stdout=PIPE, stderr=PIPE, shell=True)
