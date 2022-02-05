@@ -419,7 +419,7 @@ class NotationKeySignature(NotationMarker, Attachment):
         return self.key.ly_render()
 
     def for_marker(self) -> str:
-        return f'key:{self.key.for_librosa}'
+        return f'key:{self.key.as_str()}'
 
     @classmethod
     def from_marker(cls, string: str) -> 'NotationKeySignature':

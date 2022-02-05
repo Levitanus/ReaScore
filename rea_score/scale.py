@@ -47,6 +47,9 @@ class Key:
     def for_librosa(self) -> str:
         return f'{self.tonic}:{self.scale.for_librosa}'
 
+    def as_str(self) -> str:
+        return f'{self.tonic_for_ly}:{self.scale.value}'
+
     @property
     def tonic_for_ly(self) -> str:
         return self.tonic.replace('♭', 'es').replace('♯', 'is')

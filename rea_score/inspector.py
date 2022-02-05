@@ -11,10 +11,11 @@ from typing import List, Optional, Union, cast
 from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
     Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
-    NotationKeySignature, NotationPitch, NotationVoice, NotationStaff, Pitch
+    NotationKeySignature, NotationMarker, NotationPitch, NotationVoice,
+    NotationStaff, Pitch
 )
 
-from rea_score.scale import Accidental
+from rea_score.scale import Accidental, Key, Scale
 
 from .dom import (
     events_from_take, get_global_events, split_by_staff, update_events,
@@ -72,6 +73,21 @@ class ProjectInspector:
         if ks := cast(str, self.state('key_signature')):
             notations.append(NotationKeySignature.from_marker(ks))
         return notations
+
+    @property
+    def key_signature_at_start(self) -> Key:
+        if ks := cast(str, self.state('key_signature')):
+            return NotationKeySignature.from_marker(ks).key
+        return Key('c', Scale.major)
+
+    @key_signature_at_start.setter
+    def key_signature_at_start(self, key: Key) -> None:
+        self.state('key_signature', NotationKeySignature(key).for_marker())
+
+    def place_key_signature_at_cursor(self, key: Key) -> rpr.Marker:
+        pos = self.project.cursor_position
+        name = NotationMarker.to_reaper_marker([NotationKeySignature(key)])
+        return self.project.add_marker(pos, name, (0, 255, 0))
 
     def perform_shortcut(self, char: str) -> None:
         func = self.state(f'shortcut:{char}')
