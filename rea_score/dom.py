@@ -350,6 +350,8 @@ def notes_from_take(
     events: Dict[Position, List[Event]] = {}
     for note in take.notes:
         info = note.infos
+        if info['muted']:
+            continue
         if pitch_type == TrackPitchType.note_names:
             if not note_names[info['pitch']]:
                 continue
