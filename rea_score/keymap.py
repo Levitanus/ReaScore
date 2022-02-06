@@ -18,6 +18,7 @@ keymap = {
     '-': 'set_accidental_for_selected_notes(Accidental.es)',
     '+': 'set_accidental_for_selected_notes(Accidental.isis)',
     '_': 'set_accidental_for_selected_notes(Accidental.es)',
+    '0': 'set_accidental_for_selected_notes(Accidental.white)',
     # misc
     '`': 'add_trill_to_selected_notes()',
     '~': 'ignore_selected_notes()',
