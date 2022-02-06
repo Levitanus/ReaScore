@@ -492,6 +492,10 @@ class NotationPitch(NotationEvent):
             return NotationClef.from_midi(pitch, token)
         if token.startswith('ghost'):
             return NotationGhost.from_midi(pitch, token)
+        if token.startswith('trill'):
+            return NotationTrill.from_midi(pitch, token)
+        if token.startswith('ignore'):
+            return NotationIgnore.from_midi(pitch, token)
         return None
 
     @classmethod
@@ -931,6 +935,64 @@ class NotationGhost(NotationPitch, Attachment):
 
     def __repr__(self) -> str:
         return f'<NotationGhost {self.pitch}>'
+
+
+class NotationTrill(NotationPitch, Attachment):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return '\\trill'
+
+    @property
+    def for_midi(self) -> str:
+        return f'trill'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTrill':
+        return NotationTrill(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationTrill {self.pitch}>'
+
+
+class NotationIgnore(NotationPitch):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, NotationIgnore):
+            return self.pitch == other.pitch
+        return False
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    @property
+    def for_midi(self) -> str:
+        return f'ignore'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationIgnore':
+        return NotationIgnore(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationIgnore {self.pitch}>'
 
 
 class NotationTupletBegin(NotationPitch, Attachment):

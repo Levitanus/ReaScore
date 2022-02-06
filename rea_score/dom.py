@@ -6,9 +6,9 @@ from reapy.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
     Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
-    NotationMarker, NotationPitch, NotationEvent, NotationTimeSignature,
-    NotationTupletBegin, NotationTupletEnd, Pitch, Position, Fractured,
-    TimeSignature, Tuplet
+    NotationIgnore, NotationMarker, NotationPitch, NotationEvent,
+    NotationTimeSignature, NotationTupletBegin, NotationTupletEnd, Pitch,
+    Position, Fractured, TimeSignature, Tuplet
 )
 
 from pprint import pformat, pprint
@@ -383,6 +383,19 @@ def pitch_notations_from_take(
     return events
 
 
+def filer_ignored_notes(
+    events: Dict[Position, List[Event]]
+) -> Dict[Position, List[Event]]:
+    new = {}
+    for pos, evts in events.items():
+        new_events = []
+        for event in evts:
+            if NotationIgnore(event.pitch) not in event.prefix:
+                new_events.append(event)
+        new[pos] = new_events
+    return new
+
+
 @rpr.inside_reaper()
 def events_from_take(
     take: rpr.Take, pitch_type: TrackPitchType, note_names: List[str]
@@ -396,6 +409,7 @@ def events_from_take(
                 for notation in pitch_notations[pos]:
                     if notation.pitch.midi_pitch == note.pitch.midi_pitch:
                         notation.apply_to_event(note)
+    note_events = filer_ignored_notes(note_events)
     return note_events
 
 

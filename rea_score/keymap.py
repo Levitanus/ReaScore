@@ -19,7 +19,9 @@ keymap = {
     '+': 'set_accidental_for_selected_notes(Accidental.isis)',
     '_': 'set_accidental_for_selected_notes(Accidental.es)',
     # misc
-    '0': 'set_selected_notes_as_ghost()',
+    '`': 'add_trill_to_selected_notes()',
+    '~': 'ignore_selected_notes()',
+    'g': 'set_selected_notes_as_ghost()',
     'r': 'TrackInspector().render()',
     's': 'spread_notes()',
     'v': 'view_score()',

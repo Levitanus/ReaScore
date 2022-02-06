@@ -13,8 +13,8 @@ from typing import List, Optional, Union, cast
 from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
     Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
-    NotationKeySignature, NotationMarker, NotationPitch, NotationVoice,
-    NotationStaff, Pitch
+    NotationIgnore, NotationKeySignature, NotationMarker, NotationPitch,
+    NotationTrill, NotationVoice, NotationStaff, Pitch
 )
 
 from rea_score.scale import Accidental, Key, Scale
@@ -196,16 +196,16 @@ class TrackInspector:
             self.state('part_name', name)
             return name
         else:
-            # try:
-            # print('getting part name')
-            name = rpr.get_user_inputs(
-                'Please, provide part name:', ['part name']
-            )['part name']
-            # print(f'got {name}')
-            self.state('part_name', name)
-            return name
-            # except RuntimeError:
-            #     exit()
+            try:
+                # print('getting part name')
+                name = rpr.get_user_inputs(
+                    'Please, provide part name:', ['part name']
+                )['part name']
+                # print(f'got {name}')
+                self.state('part_name', name)
+                return name
+            except RuntimeError:
+                return ''
 
     @property
     def export_path(self) -> Path:
@@ -378,6 +378,34 @@ def set_selected_notes_as_ghost() -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationGhost(Pitch(127))]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('add_trill_to_selected_notes')
+def add_trill_to_selected_notes() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationTrill(Pitch(127))]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('ignore_selected_notes')
+def ignore_selected_notes() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationIgnore(Pitch(127))]
     )
 
 

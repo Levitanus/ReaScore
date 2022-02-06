@@ -161,6 +161,26 @@ def actions() -> None:
 
     ImGui.Dummy(ctx, 100, 20)
 
+    func = 'add_trill_to_selected_notes()'
+    text = 'trill'
+    if func in funcmap:
+        text += f" ( {funcmap[func]} )"
+    rt = ImGui.Button(ctx, text)
+    if rt:
+        proj_insp.perform_func(func)
+
+    ImGui.SameLine(ctx)
+
+    func = 'ignore_selected_notes()'
+    text = 'ignore'
+    if func in funcmap:
+        text += f" ( {funcmap[func]} )"
+    rt = ImGui.Button(ctx, text)
+    if rt:
+        proj_insp.perform_func(func)
+
+    ImGui.Dummy(ctx, 100, 20)
+
     func = 'spread_notes()'
     text = 'spread notes across bounds'
     if func in funcmap:

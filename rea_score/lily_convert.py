@@ -107,7 +107,7 @@ def render_any_event(event: Union[Event, GlobalNotationEvent],
 
 
 def render_event(event: Event, key: Key) -> str:
-    string = "{preambula}{pitch}{length}{notations}{tie}{tied}"
+    string = "{prefix}{pitch}{length}{postfix}{tie}{tied}"
     if event.length == 0:
         warn(f'Zero-kength event: {event}, returning null')
         return ''
@@ -120,17 +120,17 @@ def render_event(event: Event, key: Key) -> str:
     # if tied and tie:
     #     tie = ''
     return string.format(
-        preambula=render_prefix(event),
+        prefix=render_prefix(event),
         pitch=pitch,
         length=length,
-        notations='',
+        postfix=render_postfix(event),
         tie=tie,
         tied=tied
     )
 
 
 def render_chord(chord: Chord, key: Key) -> str:
-    string = "{preambula}<{pitches}>{length}{notations}{tie}{tied}"
+    string = "{prefix}<{pitches}>{length}{postfix}{tie}{tied}"
     pitches = []
     for pitch in chord.pitches:
         pitches.append(''.join(render_pitch(pitch, key)))
@@ -140,10 +140,10 @@ def render_chord(chord: Chord, key: Key) -> str:
     else:
         tie = ''
     return string.format(
-        preambula=render_prefix(chord),
+        prefix=render_prefix(chord),
         pitches=' '.join(pitches),
         length=length,
-        notations='',
+        postfix=render_postfix(chord),
         tie=tie,
         tied=tied
     )
@@ -164,6 +164,10 @@ def render_tuplet(tuplet: Tuplet, key: Key) -> Tuple[str, Key]:
 
 def render_prefix(event: Event) -> str:
     return ' '.join(elm.ly_render() for elm in event.prefix) + ' '
+
+
+def render_postfix(event: Event) -> str:
+    return ' '.join(elm.ly_render() for elm in event.postfix) + ' '
 
 
 def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:
