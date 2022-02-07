@@ -6,7 +6,7 @@ from reapy.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
     Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
-    NotationIgnore, NotationMarker, NotationPitch, NotationEvent,
+    NotationIgnore, NotationMarker, NotationPitch, NotationEvent, NotationText,
     NotationTimeSignature, NotationTupletBegin, NotationTupletEnd, Pitch,
     Position, Fractured, TimeSignature, Tuplet
 )
@@ -24,6 +24,8 @@ class TrackPitchType(Enum):
 class TrackType(Enum):
     default = 'default'
     drums = 'drums'
+    one_line_perc = 'one line perc'
+    bongos = 'bongos'
 
 
 class EventPackager:
@@ -44,6 +46,7 @@ class EventPackager:
         self.voice.append_to_chord(self.key, event)
 
     def split_by_position(self, event: Event) -> None:
+
         if self.key.bar_end_distance < event.length:
             left, append_part = event.split(
                 Length(float(self.key.bar_end_distance) * 4), tie=True
@@ -385,6 +388,24 @@ def pitch_notations_from_take(
     return events
 
 
+def _filter_text(event: MIDIEventDict) -> bool:
+    return NotationText.is_text_event(event)
+
+
+def staff_notations_from_take(
+    take: rpr.Take
+) -> Dict[Position, List[NotationEvent]]:
+    events: Dict[Position, List[NotationEvent]] = {}
+
+    for event in filter(_filter_text, take.get_midi()):
+        pos = Position(take.ppq_to_beat(event['ppq']))
+        n_event = NotationText.from_midibuf(event['buf'])
+        if pos not in events:
+            events[pos] = []
+        events[pos].append(n_event)
+    return events
+
+
 def filer_ignored_notes(
     events: Dict[Position, List[Event]]
 ) -> Dict[Position, List[Event]]:
@@ -405,12 +426,18 @@ def events_from_take(
     # events: Dict[Position, List[Event]] = {}
     note_events = notes_from_take(take, pitch_type, note_names)
     pitch_notations = pitch_notations_from_take(take)
+    staff_notations = staff_notations_from_take(take)
     for pos, notes in note_events.items():
         for note in notes:
             if pos in pitch_notations:
                 for notation in pitch_notations[pos]:
                     if notation.pitch.midi_pitch == note.pitch.midi_pitch:
                         notation.apply_to_event(note)
+    for pos, n_events in staff_notations.items():
+        if pos not in note_events:
+            note_events[pos] = [Event(Length.from_fraction(1 / 16), Pitch())]
+        for n_event in n_events:
+            n_event.apply_to_event(note_events[pos][0])
     note_events = filer_ignored_notes(note_events)
     return note_events
 

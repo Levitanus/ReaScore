@@ -14,7 +14,7 @@ from reapy.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
     Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
     NotationIgnore, NotationKeySignature, NotationMarker, NotationPitch,
-    NotationTrill, NotationVoice, NotationStaff, Pitch
+    NotationTrem, NotationTrill, NotationVoice, NotationStaff, Pitch
 )
 
 from rea_score.scale import Accidental, Key, Scale
@@ -107,14 +107,11 @@ class ProjectInspector:
 
     @property
     def score_tracks(self) -> List[rpr.Track]:
-        pr_tracks = cast(Optional[List[str]], self.state('tracks')) or []
+        score_guids = cast(Optional[List[str]], self.state('tracks')) or []
         tracks = []
-        for track_id in pr_tracks:
-            try:
-                track = rpr.Track.from_GUID(track_id, self.project)
-                tracks.append(track)
-            except KeyError:
-                continue
+        for tr in self.project.tracks:
+            if tr.GUID in score_guids:
+                tracks.append(tr)
         return tracks
 
     def score_track_add(self, track: rpr.Track) -> None:
@@ -161,6 +158,20 @@ class TrackInspector:
             )
             return None
         return None if key not in state else state[key]  # type:ignore
+
+    def notations_at_start(self) -> List[NotationEvent]:
+        notations: List[NotationEvent] = []
+        if clef := self.clef:
+            notations.append(NotationClef(Pitch(), clef))
+        return notations
+
+    @property
+    def clef(self) -> Clef:
+        return cast(Optional[Clef], self.state('clef')) or Clef.treble
+
+    @clef.setter
+    def clef(self, clef: Clef) -> None:
+        self.state('clef', clef)
 
     @property
     def pitch_type(self) -> TrackPitchType:
@@ -212,8 +223,18 @@ class TrackInspector:
         dir_ = ProjectInspector().export_dir
         return dir_.joinpath(f"{self.part_name}.ly")
 
+    @property
+    def octave_offset(self) -> int:
+        ofst = cast(Optional[int], self.state('octave_offset'))
+        if ofst is None:
+            ofst = 0
+        return ofst
+
+    @octave_offset.setter
+    def octave_offset(self, ofst: int) -> None:
+        self.state('octave_offset', ofst)
+
     def render(self) -> None:
-        ProjectInspector(self.track.project).score_track_add(self.track)
         events = {}
         export_path = self.export_path
         begin, end = self.track.project.length, .0
@@ -234,8 +255,10 @@ class TrackInspector:
             )
         # print('getting global events')
         global_events = get_global_events(
-            ProjectInspector(self.track.project).notations_at_start(), begin,
-            end
+            [
+                *ProjectInspector(self.track.project).notations_at_start(),
+                *self.notations_at_start()
+            ], begin, end
         )
         # events = update_events(events, global_events)
         events = {k: events[k] for k in sorted(events)}
@@ -246,7 +269,7 @@ class TrackInspector:
             staff.apply_global_events(global_events)
         # print(staves)
         # print('render part')
-        lily = render_part(staves, self.track_type)
+        lily = render_part(staves, self.track_type, self.octave_offset)
         pdf = render(lily, export_path)
         # while not pdf.exists():
         #     ...
@@ -254,6 +277,7 @@ class TrackInspector:
             with open(ProjectInspector().temp_pdf, 'wb') as out:
                 out.write(in_.read())
                 out.truncate()
+        ProjectInspector(self.track.project).score_track_add(self.track)
 
 
 class NotationPitchInspector:
@@ -392,6 +416,20 @@ def add_trill_to_selected_notes() -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationTrill(Pitch(127))]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('add_trem_to_selected_notes')
+def add_trem_to_selected_notes(trem_denom: int) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationTrem(Pitch(127), trem_denom)]
     )
 
 

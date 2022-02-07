@@ -6,7 +6,7 @@ from reapy import ImGui
 from rea_score.dom import TrackPitchType, TrackType
 
 from rea_score.scale import Key, Scale
-from rea_score.primitives import Pitch
+from rea_score.primitives import Clef, Pitch
 from rea_score.keymap import keymap, funcmap
 
 ctx = ImGui.CreateContext('ReaScore', ImGui.ConfigFlags_DockingEnable())
@@ -105,13 +105,30 @@ def track_inspector() -> None:
     ImGui.SetNextItemWidth(ctx, 100)
     rt = ImGui.BeginCombo(ctx, 'track type', ti.track_type.value)
     if rt:
-        for pt in TrackType:
-            rt, v = ImGui.Selectable(ctx, pt.value, False)
+        for tp in TrackType:
+            rt, v = ImGui.Selectable(ctx, tp.value, False)
             if v:
-                ti.track_type = pt
+                ti.track_type = tp
         ImGui.EndCombo(ctx)
 
+    ImGui.SetNextItemWidth(ctx, 100)
+    rt = ImGui.BeginCombo(ctx, 'clef at start', ti.clef.value)
+    if rt:
+        for cl in Clef:
+            rt, v = ImGui.Selectable(ctx, cl.value, False)
+            if v:
+                ti.clef = cl
+        ImGui.EndCombo(ctx)
+
+    ImGui.SetNextItemWidth(ctx, 100)
+    rt, v = ImGui.InputInt(ctx, 'octave_offset', ti.octave_offset)
+    if rt:
+        ti.octave_offset = v
+
     ImGui.TreePop(ctx)
+
+
+actions_values = {'trem_denom': 32}
 
 
 def actions() -> None:
@@ -158,6 +175,26 @@ def actions() -> None:
         rt = ImGui.Button(ctx, text, width)
         if rt:
             proj_insp.perform_func(func)
+
+    ImGui.Dummy(ctx, 100, 20)
+
+    ImGui.SetNextItemWidth(ctx, 60)
+    rt = ImGui.BeginCombo(ctx, 'tremolo by', actions_values['trem_denom'])
+    if rt:
+        for i, denom in enumerate((8, 16, 32, 64)):
+            rt, v = ImGui.Selectable(ctx, str(denom), 0)
+            if rt:
+                actions_values['trem_denom'] = denom
+        ImGui.EndCombo(ctx)
+    ImGui.SameLine(ctx)
+
+    func = f'add_trem_to_selected_notes({actions_values["trem_denom"]})'
+    text = 'add trem'
+    if func in funcmap:
+        text += f" ( {funcmap[func]} )"
+    rt = ImGui.Button(ctx, text)
+    if rt:
+        proj_insp.perform_func(func)
 
     ImGui.Dummy(ctx, 100, 20)
 
@@ -267,7 +304,6 @@ def loop() -> None:
 
         track_inspector()
         actions()
-
     ImGui.PopFont(ctx)
     if visible:
         ImGui.End(ctx)
@@ -278,4 +314,10 @@ def loop() -> None:
         ImGui.DestroyContext(ctx)
 
 
-rpr.defer(loop)
+def run():
+    import cProfile
+    cProfile.run("loop()")
+    # rpr.defer(loop)
+
+
+rpr.defer(run)

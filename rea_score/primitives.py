@@ -237,6 +237,7 @@ class Length(Fractured):
     def __init__(self, length_in_beats: float, full_bar: bool = False) -> None:
         self.length = round(length_in_beats, ROUND_QUARTERS)
         self.full_bar = full_bar
+        self.trem_denom = 0
 
     @property
     def fraction(self) -> Fraction:
@@ -494,6 +495,8 @@ class NotationPitch(NotationEvent):
             return NotationGhost.from_midi(pitch, token)
         if token.startswith('trill'):
             return NotationTrill.from_midi(pitch, token)
+        if token.startswith('trem'):
+            return NotationTrem.from_midi(pitch, token)
         if token.startswith('ignore'):
             return NotationIgnore.from_midi(pitch, token)
         return None
@@ -628,7 +631,10 @@ class Event:
         right.length = Length(self.length.length - at_length.length)
         right.prefix = []
         left.postfix = []
-        if tie:
+        support_tie = False
+        if self.pitch.midi_pitch is not None:
+            support_tie = True
+        if tie and support_tie:
             left.pitch.tie = tie
         return left, right
 
@@ -963,6 +969,73 @@ class NotationTrill(NotationPitch, Attachment):
 
     def __repr__(self) -> str:
         return f'<NotationTrill {self.pitch}>'
+
+
+class NotationTrem(NotationPitch):
+
+    def __init__(self, pitch: Pitch, trem_denom: int) -> None:
+        super().__init__(pitch)
+        self.trem_denom = trem_denom
+
+    def apply_to_event(self, event: Event) -> None:
+        event.length.trem_denom = self.trem_denom
+
+    def ly_render(self) -> str:
+        return f':{self.trem_denom}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'trem:{self.trem_denom}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTrem':
+        return NotationTrem(pitch, int(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.trem_denom = new.trem_denom
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationTrem {self.pitch}, {self.trem_denom}>'
+
+
+class NotationText(NotationEvent, Attachment):
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'^\\markup "{self.text}"'
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.text = new.text
+        return True
+
+    @classmethod
+    def is_text_event(cls, event: MIDIEventDict) -> bool:
+        if (event['buf'][0]) != 0xff:
+            return False
+        # print(event['buf'][0:2], 0 < event['buf'][1] < 15)
+        if 0 < event['buf'][1] < 15:
+            return True
+        return False
+
+    @classmethod
+    def from_midibuf(cls, buf: ty.List[int]) -> 'NotationText':
+        text = bytes(buf[2:]).decode('latin-1')
+        return NotationText(text)
+
+    def __repr__(self) -> str:
+        return f'<NotationText "{self.text}">'
 
 
 class NotationIgnore(NotationPitch):
