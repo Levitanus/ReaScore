@@ -1,12 +1,12 @@
 from fractions import Fraction
 from warnings import warn
-from typing import Dict, List, NewType, Optional, Tuple, Union
+from typing import Dict, List, NewType, Optional, Tuple, TypedDict, Union
 import re
 
 from rea_score.dom import EventT, TrackType
 from rea_score.primitives import NotationKeySignature
 
-from .dom import Staff, Voice, events_from_take, split_by_voice
+from .dom import Staff, StaffGroup, Voice, events_from_take, split_by_voice
 from .primitives import (
     Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position, Scale,
     Tuplet, Clef
@@ -17,26 +17,63 @@ from .primitives import (
 
 KEY = Key('c', Scale.major)
 
+ALPHABET: Dict[int, str] = {
+    1: 'A',
+    2: 'B',
+    3: 'C',
+    4: 'D',
+    5: 'E',
+    6: 'F',
+    7: 'G',
+    8: 'H',
+    9: 'I'
+}
+
+
+class LyDict(TypedDict):
+    var: str
+    definition: str
+    expression: str
+
+
+_part_definition = """{staff_defs}\n{var} = << {staff_expressions} >>"""
+_part_expression = """\\new {staffGroup} \\{var}"""
+
 
 def render_part(
-    staves: List[Staff], track_type: TrackType, octave_offset: int
-) -> str:
-    if len(staves) == 1:
-        return render_staff(staves[0], track_type, octave_offset)
-    group = 'GrandStaff'
-    part_string = """\\new {group} <<{staves}>>"""
-    return part_string.format(
-        group=group,
-        staves='\n'.join(
-            render_staff(staff, track_type, octave_offset) for staff in staves
+    name: str,
+    staves: List[Staff],
+    track_type: TrackType,
+    octave_offset: int,
+    staff_group: StaffGroup = StaffGroup.GrandStaff,
+) -> LyDict:
+    rendered = [
+        render_staff(staff, track_type, octave_offset) for staff in staves
+    ]
+    return LyDict(
+        var=name,
+        definition=_part_definition.format(
+            staff_defs='\n'.join(
+                list([staff['definition'] for staff in rendered])
+            ),
+            var=name,
+            staff_expressions=' '.join(
+                list([staff['expression'] for staff in rendered])
+            )
+        ),
+        expression=_part_expression.format(
+            staffGroup=staff_group.value, var=name
         )
     )
 
 
+_staff_definition = """{voice_defs}\n{var} = <<{clef} {voice_vars} >>"""
+_staff_expression = """\\new {staff_str} {{\\{var}}}"""
+
+
 def render_staff(
     staff: Staff, track_type: TrackType, octave_offset: int
-) -> str:
-    staff_string = """\\new {staff_str} <<{clef} {voices}>>"""
+) -> LyDict:
     staff_str = 'Staff'
     if track_type == TrackType.drums:
         staff_str = 'DrumStaff'
@@ -55,36 +92,53 @@ def render_staff(
         drumStyleTable = #bongos-style
         \\override StaffSymbol.line-count = #2}
         """
-    rendered_voices = []
+
+    litera = ALPHABET[staff.staff_nr]
+    var = f'Staff{litera}'
+
+    voice_defs = []
+    voice_expressions = []
     for voice in staff:
-        rendered_voices.append(
-            render_voice(
-                voice,
-                voice.voice_nr,
-                track_type=track_type,
-                octave_offset=octave_offset
-            )
+        voice_dict = render_voice(
+            voice,
+            voice.voice_nr,
+            track_type=track_type,
+            octave_offset=octave_offset
         )
-    return staff_string.format(
-        staff_str=staff_str,
-        clef=staff.clef.ly_render(),
-        voices='\n'.join(rendered_voices)
+        voice_defs.append(voice_dict['definition'])
+        voice_expressions.append(voice_dict['expression'])
+    return LyDict(
+        var=var,
+        definition=_staff_definition.format(
+            voice_defs='\n'.join(voice_defs),
+            var=var,
+            clef=staff.clef.ly_render(),
+            voice_vars="\n".join(voice_expressions),
+        ),
+        expression=_staff_expression.format(staff_str=staff_str, var=var)
     )
+
+
+_voice_definition = """\
+{var} =  {mode} {{
+    \\{voice_str} {events}
+}}
+"""
+_voice_expression = """\\new {voice_def} = \"{litera}\" {{\\{var}}}"""
 
 
 def render_voice(
     voice: Voice,
-    index: Optional[int] = None,
-    name: Optional[str] = None,
+    index: int = 1,
     track_type: TrackType = TrackType.default,
     octave_offset: int = 0,
-) -> str:
+) -> LyDict:
     # print(f"finalizing voice {voice}")
     key = KEY
     voice = voice.finalized()
-    args = {}
     voice_str = voice.voice_str
     voicedef = 'Voice'
+
     mode = ''
     if track_type in (
         TrackType.drums, TrackType.one_line_perc, TrackType.bongos
@@ -92,22 +146,24 @@ def render_voice(
         voice_str = 'stemUp' if index == 1 else 'stemDown'
         voicedef = 'DrumVoice'
         mode = '\\drummode'
-    if name:
-        if index:
-            name = f'{name}index'
-        args['name'] = name
+
+    litera = ALPHABET[index]
+    var = f'Voice{litera}'
+
     out = []
     for event in voice.events.values():
         event_str = ''
         event_str, key = render_any_event(event, key, octave_offset)
         out.append(event_str)
     # key = KEY.ly_render()
-    return "\\new {voicedef} = \"{idx}\" {mode} {{\\{voicestr} {voiceout}}}".format(
-        voicedef=voicedef,
-        idx=index,
-        mode=mode,
-        voicestr=voice_str,
-        voiceout=' '.join(out)
+    return LyDict(
+        definition=_voice_definition.format(
+            var=var, mode=mode, voice_str=voice_str, events=' '.join(out)
+        ),
+        expression=_voice_expression.format(
+            voice_def=voicedef, litera=litera, var=var
+        ),
+        var=var,
     )
 
 

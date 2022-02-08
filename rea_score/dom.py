@@ -28,6 +28,13 @@ class TrackType(Enum):
     bongos = 'bongos'
 
 
+class StaffGroup(Enum):
+    GrandStaff = "GrandStaff"
+    StaffGroup = "StaffGroup"
+    ChoirStaff = "ChoirStaff"
+    PianoStaff = "PianoStaff"
+
+
 class EventPackager:
 
     def __init__(self, voice: 'Voice', key: Position) -> None:

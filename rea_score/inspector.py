@@ -269,7 +269,10 @@ class TrackInspector:
             staff.apply_global_events(global_events)
         # print(staves)
         # print('render part')
-        lily = render_part(staves, self.track_type, self.octave_offset)
+        lily_dict = render_part(
+            self.part_name, staves, self.track_type, self.octave_offset
+        )
+        lily = f'''{lily_dict['definition']}\n{lily_dict['expression']}'''
         pdf = render(lily, export_path)
         # while not pdf.exists():
         #     ...
