@@ -50,6 +50,8 @@ def render_part(
     rendered = [
         render_staff(staff, track_type, octave_offset) for staff in staves
     ]
+    if len(rendered) == 1:
+        return rendered[0]
     return LyDict(
         var=name,
         definition=_part_definition.format(
@@ -80,18 +82,18 @@ def render_staff(
         staff.clef = Clef.percussion
     elif track_type == TrackType.one_line_perc:
         staff.clef = Clef.percussion
-        staff_str = """\
-        DrumStaff \\with{
-        drumStyleTable = #percussion-style
-        \\override StaffSymbol.line-count = #1}
-        """
+        staff_str = (
+            'DrumStaff \\with{\n'
+            'drumStyleTable = #percussion-style\n'
+            '\\override StaffSymbol.line-count = #1}'
+        )
     elif track_type == TrackType.bongos:
         staff.clef = Clef.percussion
-        staff_str = """\
-        DrumStaff \\with{
-        drumStyleTable = #bongos-style
-        \\override StaffSymbol.line-count = #2}
-        """
+        staff_str = (
+            'DrumStaff \\with{\n'
+            'drumStyleTable = #bongos-style\n'
+            '\\override StaffSymbol.line-count = #2}'
+        )
 
     litera = ALPHABET[staff.staff_nr]
     var = f'Staff{litera}'
@@ -236,7 +238,7 @@ def render_chord(chord: Chord, key: Key, octave_offset: int) -> str:
 
 def render_tuplet(tuplet: Tuplet, key: Key,
                   octave_offset: int) -> Tuple[str, Key]:
-    string = "{prefix} \\tuplet {rate} {{{events}}}"
+    string = "{prefix}\\tuplet {rate} {{{events}}}"
     events_str = []
     for event in tuplet.events:
         event_str, key = render_any_event(event, key, octave_offset)
@@ -249,11 +251,19 @@ def render_tuplet(tuplet: Tuplet, key: Key,
 
 
 def render_prefix(event: Event) -> str:
-    return ' '.join(elm.ly_render() for elm in event.prefix) + ' '
+    string = ' '.join(elm.ly_render() for elm in event.prefix)
+    if string:
+        return string + ' '
+    else:
+        return ''
 
 
 def render_postfix(event: Event) -> str:
-    return ' '.join(elm.ly_render() for elm in event.postfix) + ' '
+    string = ' '.join(elm.ly_render() for elm in event.postfix)
+    if string:
+        return string + ' '
+    else:
+        return ''
 
 
 def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:
