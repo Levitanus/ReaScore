@@ -1,4 +1,5 @@
 from enum import Enum, IntEnum
+from pathlib import Path
 from typing import cast
 import reapy as rpr
 from rea_score import inspector as it
@@ -8,6 +9,8 @@ from rea_score.dom import TrackPitchType, TrackType
 from rea_score.scale import Key, Scale
 from rea_score.primitives import Clef, Pitch
 from rea_score.keymap import keymap, funcmap
+
+import cProfile
 
 ctx = ImGui.CreateContext('ReaScore', ImGui.ConfigFlags_DockingEnable())
 # font_path = Path(__file__).parent.parent.joinpath('Montserrat-Regular.ttf')
@@ -68,6 +71,19 @@ def key_signatures() -> None:
     ImGui.TreePop(ctx)
 
 
+def part_name_wgt(
+    part_name: str, track: rpr.Track, no_label: bool = False
+) -> None:
+    ti = it.TrackInspector(track)
+    ImGui.SetNextItemWidth(ctx, 100)
+    rt, v = ImGui.InputText(
+        ctx, '' if no_label else 'part name', part_name, 200
+    )
+    if rt:
+        # print(ti, rt, v, track.index, track.name, part_name)
+        ti.part_name = v
+
+
 def track_inspector() -> None:
     rt = ImGui.TreeNode(
         ctx, 'Track Inspector', ImGui.TreeNodeFlags_DefaultOpen()
@@ -81,9 +97,6 @@ def track_inspector() -> None:
     else:
         part_name = 'not rendered'
     ImGui.TextColored(ctx, Color.value, track.name)
-    ImGui.Text(ctx, 'part name: ')
-    ImGui.SameLine(ctx)
-    ImGui.TextColored(ctx, Color.value, part_name)
     ImGui.SameLine(ctx)
     func = 'TrackInspector().render()'
     text = 'render'
@@ -92,6 +105,10 @@ def track_inspector() -> None:
     rt = ImGui.Button(ctx, text)
     if rt:
         ti.render()
+
+    part_name_wgt(part_name, track)
+    # ImGui.TextColored(ctx, Color.value, part_name)
+    # ImGui.SameLine(ctx)
 
     ImGui.SetNextItemWidth(ctx, 100)
     rt = ImGui.BeginCombo(ctx, 'pitch type', ti.pitch_type.value)
@@ -237,6 +254,76 @@ def actions() -> None:
     ImGui.TreePop(ctx)
 
 
+def score_inspector() -> None:
+    tracks = proj_insp.score_tracks
+    clipper = ImGui.CreateListClipper(ctx)
+
+    ImGui.BeginTable(ctx, 'score_tracks', 4)
+
+    ImGui.TableSetupColumn(
+        ctx,
+        'nr',
+        # init_width_or_weightInOptional=30,
+    )
+    ImGui.TableSetupColumn(
+        ctx,
+        'track name',
+        # init_width_or_weightInOptional=100,
+    )
+    ImGui.TableSetupColumn(
+        ctx,
+        'part name',
+        # init_width_or_weightInOptional=100,
+    )
+    ImGui.TableSetupColumn(
+        ctx,
+        'actions',
+        # init_width_or_weightInOptional=50,
+    )
+    ImGui.TableHeadersRow(ctx)
+
+    def swap_tracks(idx: int, swap: int) -> None:
+        tracks[swap], tracks[idx] = tracks[idx], tracks[swap]
+        proj_insp.score_tracks = tracks
+
+    for idx, track in enumerate(tracks):
+        guid = track.GUID
+        ImGui.PushID(ctx, guid)
+
+        if ImGui.TableNextColumn(ctx):
+            ImGui.Text(ctx, track.index)
+        if ImGui.TableNextColumn(ctx):
+            ImGui.Text(ctx, track.name)
+        if ImGui.TableNextColumn(ctx):
+            ti = it.TrackInspector(track)
+            part_name_wgt(ti.part_name, track, no_label=True)
+        # ImGui.Text(ctx, it.TrackInspector(track).part_name)
+        if ImGui.TableNextColumn(ctx):
+            rt = ImGui.Button(ctx, '-')
+            if rt:
+                tracks.remove(track)
+                proj_insp.score_tracks = tracks
+        ImGui.SameLine(ctx)
+        if ImGui.Button(ctx, 'up'):
+            if idx - 1 < 0:
+                swap = len(tracks) - 1
+            else:
+                swap = idx - 1
+            swap_tracks(idx, swap)
+        ImGui.SameLine(ctx)
+        if ImGui.Button(ctx, 'dwn'):
+            if idx + 1 >= len(tracks):
+                swap = 0
+            else:
+                swap = idx + 1
+            swap_tracks(idx, swap)
+        ImGui.TableNextRow(ctx)
+
+        ImGui.PopID(ctx)
+
+    ImGui.EndTable(ctx)
+
+
 class DockWidget:
 
     def __init__(
@@ -286,6 +373,17 @@ def view_score() -> None:
         proj_insp.perform_func(func)
 
 
+def export_path() -> None:
+    current = proj_insp.export_dir
+    ImGui.SetNextItemWidth(ctx, 150)
+    rt, v = ImGui.InputText(ctx, 'export path', current, 500)
+    if rt:
+        proj_insp.export_dir = Path(v)
+    ImGui.SameLine(ctx)
+    if ImGui.Button(ctx, 'render score'):
+        proj_insp.render_score()
+
+
 dock = DockWidget(ctx, proj_insp)
 
 
@@ -300,10 +398,15 @@ def loop() -> None:
         dock.frame()
         ImGui.SameLine(ctx, spacingInOptional=40)
         view_score()
+        export_path()
         key_signatures()
 
         track_inspector()
         actions()
+
+        if ImGui.TreeNode(ctx, 'score inspector'):
+            score_inspector()
+            ImGui.TreePop(ctx)
     ImGui.PopFont(ctx)
     if visible:
         ImGui.End(ctx)
@@ -315,8 +418,8 @@ def loop() -> None:
 
 
 def run():
-    import cProfile
-    cProfile.run("loop()")
+
+    cProfile.run("loop()", sort="cumtime")
     # rpr.defer(loop)
 
 

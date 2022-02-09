@@ -68,7 +68,7 @@ def format_lines(lilypond: str) -> List[str]:
     return out
 
 
-def render(lilypond: str, file: Path) -> Path:
+def render(lilypond: str, file: Path, compile_ly: bool = True) -> Path:
     ver = lily_version()
     string = f'{ver}\n{lilypond}'
     lines = format_lines(string)
@@ -77,8 +77,9 @@ def render(lilypond: str, file: Path) -> Path:
         io.write('\n'.join(lines))
     # print(subprocess.check_output(['lilypond', str(ly)]))
     pdf = file.with_suffix('.pdf')
-    process = subprocess.Popen(['lilypond', str(ly)], cwd=pdf.parent)
-    process.wait()
+    if compile_ly:
+        process = subprocess.Popen(['lilypond', str(ly)], cwd=pdf.parent)
+        process.wait()
     return pdf
 
 

@@ -773,7 +773,7 @@ class Tuplet(Event):
                 fraction.numerator /
                 Fractured.closest_power_of_two(fraction.denominator)
             ).limit_denominator(LIMIT_DENOMINATOR)
-        print(real, truncated)
+        # print(real, truncated)
         rate = Fraction(real / truncated).limit_denominator(LIMIT_DENOMINATOR)
         self._rate = TupletRate(rate.denominator, rate.numerator)
         return self._rate

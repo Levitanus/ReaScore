@@ -23,7 +23,7 @@ from .dom import (
     events_from_take, get_global_events, split_by_staff, update_events,
     TrackPitchType, TrackType
 )
-from .lily_convert import render_staff
+from .lily_convert import LyDict, render_staff
 from .lily_export import render
 from .keymap import keymap
 
@@ -40,13 +40,31 @@ class ProjectInspector:
 
     @property
     def export_dir(self) -> Path:
-        if path := self.state('export_dir'):
-            return path  # type:ignore
-        path = Path(self.project.path)
-        if not path.is_dir():
-            return path.parent
+        if path := cast(Optional[Path], self.state('export_dir')):
+            out = path
         else:
+            path = Path('score')
+        if not path.is_absolute():
             return path
+        if not path.is_dir():
+            out = path.parent.relative_to(self.project.path)
+        else:
+            out = path.relative_to(self.project.path)
+        return out
+
+    @export_dir.setter
+    def export_dir(self, path: Path) -> None:
+        if path.is_absolute():
+            path = path.relative_to(Path(self.project.path))
+        self.state('export_dir', path)
+
+    @property
+    def export_dir_absolute(self) -> Path:
+        relative = self.export_dir
+        path = Path(self.project.path).resolve()
+        if not path.is_dir():
+            path = path.parent
+        return path.absolute().joinpath(relative)
 
     def state(self,
               key: str,
@@ -71,7 +89,7 @@ class ProjectInspector:
             return path.joinpath('temp.pdf')
 
     def notations_at_start(self) -> List[NotationEvent]:
-        print('notations at start')
+        # print('notations at start')
         notations: List[NotationEvent] = []
         if ks := cast(str, self.state('key_signature')):
             notations.append(NotationKeySignature.from_marker(ks))
@@ -108,11 +126,19 @@ class ProjectInspector:
     @property
     def score_tracks(self) -> List[rpr.Track]:
         score_guids = cast(Optional[List[str]], self.state('tracks')) or []
-        tracks = []
+        pr_guids = {}
         for tr in self.project.tracks:
-            if tr.GUID in score_guids:
-                tracks.append(tr)
+            pr_guids[tr.GUID] = tr
+        tracks = []
+        for guid in score_guids:
+            if guid not in pr_guids:
+                continue
+            tracks.append(pr_guids[guid])
         return tracks
+
+    @score_tracks.setter
+    def score_tracks(self, tracks: List[rpr.Track]) -> None:
+        self.state('tracks', list([tr.GUID for tr in tracks]))
 
     def score_track_add(self, track: rpr.Track) -> None:
         pr_tracks = [tr.GUID for tr in self.score_tracks]
@@ -128,8 +154,19 @@ class ProjectInspector:
         pr_tracks.remove(track.GUID)
         self.state('tracks', pr_tracks)
 
-    # def set_shortcut(self, char: str, func: str) -> None:
-    #     self.state(f'shortcut:{char}', func)
+    def render_score(self) -> None:
+        render_dicts = []
+        for track in self.score_tracks:
+            render_dicts.append(TrackInspector(track).render(compile_ly=False))
+        return
+        lily = render_score(render_dicts)
+        export_path = self.export_dir_absolute
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf = render(lily, export_path)
+        with open(pdf, 'rb') as in_:
+            with open(ProjectInspector().temp_pdf, 'wb') as out:
+                out.write(in_.read())
+                out.truncate()
 
 
 class TrackInspector:
@@ -218,9 +255,13 @@ class TrackInspector:
             except RuntimeError:
                 return ''
 
+    @part_name.setter
+    def part_name(self, name: str) -> None:
+        self.state('part_name', name)
+
     @property
     def export_path(self) -> Path:
-        dir_ = ProjectInspector().export_dir
+        dir_ = ProjectInspector().export_dir_absolute
         return dir_.joinpath(f"{self.part_name}.ly")
 
     @property
@@ -234,7 +275,7 @@ class TrackInspector:
     def octave_offset(self, ofst: int) -> None:
         self.state('octave_offset', ofst)
 
-    def render(self) -> None:
+    def render(self, compile_ly: bool = True) -> LyDict:
         events = {}
         export_path = self.export_path
         begin, end = self.track.project.length, .0
@@ -273,7 +314,8 @@ class TrackInspector:
             self.part_name, staves, self.track_type, self.octave_offset
         )
         lily = f'''{lily_dict['definition']}\n{lily_dict['expression']}'''
-        pdf = render(lily, export_path)
+        export_path.parent.mkdir(parents=True, exist_ok=True)
+        pdf = render(lily, export_path, compile_ly)
         # while not pdf.exists():
         #     ...
         with open(pdf, 'rb') as in_:
@@ -281,6 +323,7 @@ class TrackInspector:
                 out.write(in_.read())
                 out.truncate()
         ProjectInspector(self.track.project).score_track_add(self.track)
+        return lily_dict
 
 
 class NotationPitchInspector:

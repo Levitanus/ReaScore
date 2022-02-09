@@ -36,6 +36,17 @@ class LyDict(TypedDict):
     expression: str
 
 
+def render_score(parts: List[LyDict]) -> str:
+    ...
+
+
+def normalize_name(name: str) -> str:
+    name = re.sub(r'\s', '_', name)
+    if m := re.search(r'(\d+)', name):
+        name = re.sub(r'\d+', ALPHABET[int(m.group(0))], name)
+    return name
+
+
 _part_definition = """{staff_defs}\n{var} = << {staff_expressions} >>"""
 _part_expression = """\\new {staffGroup} \\{var}"""
 
@@ -47,8 +58,10 @@ def render_part(
     octave_offset: int,
     staff_group: StaffGroup = StaffGroup.GrandStaff,
 ) -> LyDict:
+    name_var = normalize_name(name)
     rendered = [
-        render_staff(staff, track_type, octave_offset) for staff in staves
+        render_staff(staff, track_type, octave_offset, name=name_var)
+        for staff in staves
     ]
     if len(rendered) == 1:
         return rendered[0]
@@ -74,7 +87,10 @@ _staff_expression = """\\new {staff_str} {{\\{var}}}"""
 
 
 def render_staff(
-    staff: Staff, track_type: TrackType, octave_offset: int
+    staff: Staff,
+    track_type: TrackType,
+    octave_offset: int,
+    name: str = ''
 ) -> LyDict:
     staff_str = 'Staff'
     if track_type == TrackType.drums:
@@ -96,7 +112,10 @@ def render_staff(
         )
 
     litera = ALPHABET[staff.staff_nr]
-    var = f'Staff{litera}'
+    if name:
+        var = name
+    else:
+        var = f'Staff{litera}'
 
     voice_defs = []
     voice_expressions = []
