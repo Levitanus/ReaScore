@@ -289,17 +289,18 @@ def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:
     tied = ''
     tie = '~ '
     trem = '' if not length.trem_denom else f':{length.trem_denom}'
+    bar = '' if not length.bar_multiplier else f'*{length.bar_multiplier}'
     if rest:
         tie = ' r'
     for idx, lth in enumerate(reversed(length.normalized(length.fraction))):
         if idx == 0:
             if lth > 1:
                 f_lth = '1'
-                tied += fraction_to_length(lth - 1) + trem
+                tied += fraction_to_length(lth - 1) + trem + bar
             else:
-                f_lth = fraction_to_length(lth) + trem
+                f_lth = fraction_to_length(lth) + trem + bar
         else:
-            tied += tie + fraction_to_length(lth) + trem
+            tied += tie + fraction_to_length(lth) + trem + bar
     return f_lth, tied
 
 

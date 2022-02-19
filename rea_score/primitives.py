@@ -238,6 +238,7 @@ class Length(Fractured):
         self.length = round(length_in_beats, ROUND_QUARTERS)
         self.full_bar = full_bar
         self.trem_denom = 0
+        self.bar_multiplier = 0
 
     @property
     def fraction(self) -> Fraction:

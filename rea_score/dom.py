@@ -240,6 +240,26 @@ class Voice:
             self.events = {k: self.events[k] for k in sorted(self.events)}
         return self
 
+    def with_compressed_rests(self) -> 'Voice':
+        last_event: Optional[Event] = None
+        new = {}
+        for position, event in self.events.items():
+            if event.length.full_bar:
+                if last_event is None:
+                    last_event = event
+                elif last_event.length == event.length:
+                    if not last_event.length.bar_multiplier:
+                        last_event.length.bar_multiplier += 1
+                    last_event.length.bar_multiplier += 1
+                    continue
+                else:
+                    last_event = event
+            else:
+                last_event = None
+            new[position] = event
+        self.events = new
+        return self
+
     def finalized(self) -> 'Voice':
         self.sort()
         with_rests = self.with_rests()
@@ -247,7 +267,8 @@ class Voice:
         with_globals = with_tuples.apply_global_events(
             self.globals, forced=True
         )
-        return with_globals
+        compressed_rests = with_globals.with_compressed_rests()
+        return compressed_rests
 
 
 class Staff:
