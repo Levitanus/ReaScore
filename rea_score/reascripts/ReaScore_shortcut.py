@@ -1,5 +1,5 @@
-from reapy import ImGui
-import reapy as rpr
+from reapy_boost import ImGui
+import reapy_boost as rpr
 from rea_score.inspector import ProjectInspector
 
 ctx = ImGui.CreateContext('getkey', True)

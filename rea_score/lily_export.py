@@ -87,7 +87,7 @@ def render(lilypond: str, file: Path, compile_ly: bool = True) -> Path:
 # lily_string = """    {\\new Staff <<\
 #     \\new Voice {r1 | r1 | r8 cis''8. b'8.~ <dis''~ b'>16 <dis''>8 fis''16 \
 #     <fis''~ b''>16 <fis'' cis'''~>32 cis'''32 b''8 | }>>}"""
-# import reapy as rpr
+# import reapy_boost as rpr
 # with rpr.inside_reaper():
 #     lily_string = any_to_lily(rpr.Project().selected_items[0].active_take)
 # # print(lily_string)

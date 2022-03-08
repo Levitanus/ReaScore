@@ -1,8 +1,8 @@
 from enum import Enum
 import re
 from typing import Dict, Iterable, Iterator, List, Optional, TypeVar, Union
-import reapy as rpr
-from reapy.core.item.midi_event import MIDIEventDict
+import reapy_boost as rpr
+from reapy_boost.core.item.midi_event import MIDIEventDict
 
 from .primitives import (
     Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,

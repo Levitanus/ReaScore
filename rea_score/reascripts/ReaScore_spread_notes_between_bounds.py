@@ -1,5 +1,5 @@
 import typing as ty
-import reapy as rpr
+import reapy_boost as rpr
 
 
 def get_bounds(midi: ty.Iterable[rpr.MIDIEventDict]) -> ty.Tuple[float, float]:

@@ -1,5 +1,5 @@
-# print('import reapy as rpr')
-import reapy as rpr
+# print('import reapy_boost as rpr')
+import reapy_boost as rpr
 
 # print('import rea_score.inspector as it')
 import rea_score.inspector as it

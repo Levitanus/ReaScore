@@ -1,9 +1,9 @@
 from enum import Enum, IntEnum
 from pathlib import Path
 from typing import cast
-import reapy as rpr
+import reapy_boost as rpr
 from rea_score import inspector as it
-from reapy import ImGui
+from reapy_boost import ImGui
 from rea_score.dom import TrackPitchType, TrackType
 
 from rea_score.scale import Key, Scale

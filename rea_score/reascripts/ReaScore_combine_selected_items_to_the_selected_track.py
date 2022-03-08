@@ -1,6 +1,6 @@
 from typing import Callable, List
 from rea_score.primitives import NotationPitch
-import reapy as rpr
+import reapy_boost as rpr
 
 
 class NormalizedMIDI(rpr.MIDIEventDict):

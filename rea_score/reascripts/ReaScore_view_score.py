@@ -26,7 +26,7 @@ from platform import system
 
 import rea_score.inspector as it
 
-import reapy as rpr
+import reapy_boost as rpr
 
 OSNAME = system().lower()
 
@@ -51,8 +51,9 @@ def get_open_command(filepath):
         opener = 'open'
     else:
         opener = 'xdg-open'
-    return '{opener} {filepath}'.format(opener=opener,
-                                        filepath=f"'{filepath}'")
+    return '{opener} {filepath}'.format(
+        opener=opener, filepath=f"'{filepath}'"
+    )
 
 
 filepath = it.ProjectInspector().temp_pdf

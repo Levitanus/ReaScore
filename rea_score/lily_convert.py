@@ -12,7 +12,7 @@ from .primitives import (
     Tuplet, Clef
 )
 
-# import reapy as rpr
+# import reapy_boost as rpr
 # import abjad
 
 KEY = Key('c', Scale.major)
@@ -59,6 +59,8 @@ def render_part(
     staff_group: StaffGroup = StaffGroup.GrandStaff,
 ) -> LyDict:
     name_var = normalize_name(name)
+    if len(staves) > 0:
+        name_var = ''
     rendered = [
         render_staff(staff, track_type, octave_offset, name=name_var)
         for staff in staves
@@ -124,7 +126,8 @@ def render_staff(
             voice,
             voice.voice_nr,
             track_type=track_type,
-            octave_offset=octave_offset
+            octave_offset=octave_offset,
+            name=var + "Voice" + ALPHABET[voice.voice_nr]
         )
         voice_defs.append(voice_dict['definition'])
         voice_expressions.append(voice_dict['expression'])
@@ -153,6 +156,7 @@ def render_voice(
     index: int = 1,
     track_type: TrackType = TrackType.default,
     octave_offset: int = 0,
+    name=''
 ) -> LyDict:
     # print(f"finalizing voice {voice}")
     key = KEY
@@ -170,6 +174,8 @@ def render_voice(
 
     litera = ALPHABET[index]
     var = f'Voice{litera}'
+    if name:
+        var = name
 
     out = []
     for event in voice.events.values():

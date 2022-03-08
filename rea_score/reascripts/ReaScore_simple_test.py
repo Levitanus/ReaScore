@@ -1,11 +1,11 @@
-import reapy as rpr
+import reapy_boost as rpr
 
-import reapy as rpr
-from reapy import reascript_api as RPR
+import reapy_boost as rpr
+from reapy_boost import reascript_api as RPR
 from rea_score.primitives import Position
 from pprint import pprint
-from reapy import reascript_api as RPR
-from reapy import ImGui
+from reapy_boost import reascript_api as RPR
+from reapy_boost import ImGui
 
 take = rpr.Project().selected_items[0].active_take
 midi = take.get_midi()

@@ -6,9 +6,9 @@ import re
 import typing as ty
 import warnings
 # import librosa
-import reapy as rpr
-from reapy import reascript_api as RPR
-from reapy.core.item.midi_event import MIDIEventDict
+import reapy_boost as rpr
+from reapy_boost import reascript_api as RPR
+from reapy_boost.core.item.midi_event import MIDIEventDict
 
 from .scale import Accidental, ENHARM_ACC, Scale, midi_to_note, Key
 

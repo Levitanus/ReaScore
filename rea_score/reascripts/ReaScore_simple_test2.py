@@ -1,4 +1,4 @@
-import reapy as rpr
+import reapy_boost as rpr
 
 from pprint import pprint
 

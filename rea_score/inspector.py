@@ -2,15 +2,15 @@ from copy import deepcopy
 from enum import Enum
 from pathlib import Path
 
-from reapy.core.reaper.reaper import perform_action
+from reapy_boost.core.reaper.reaper import perform_action
 
 from rea_score.lily_convert import render_part
 
-import reapy as rpr
-from reapy import reascript_api as RPR
+import reapy_boost as rpr
+from reapy_boost import reascript_api as RPR
 from typing import List, Optional, Union, cast
 
-from reapy.core.item.midi_event import CCShapeFlag
+from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
     Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
     NotationIgnore, NotationKeySignature, NotationMarker, NotationPitch,
