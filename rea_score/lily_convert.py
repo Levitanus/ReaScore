@@ -4,30 +4,18 @@ from typing import Dict, List, NewType, Optional, Tuple, TypedDict, Union
 import re
 
 from rea_score.dom import EventT, TrackType
-from rea_score.primitives import NotationKeySignature
+from rea_score.notation_events import NotationKeySignature
 
 from .dom import Staff, StaffGroup, Voice, events_from_take, split_by_voice
 from .primitives import (
-    Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position, Scale,
-    Tuplet, Clef
+    ALPHABET, Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position,
+    Scale, Tuplet, Clef
 )
 
 # import reapy_boost as rpr
 # import abjad
 
 KEY = Key('c', Scale.major)
-
-ALPHABET: Dict[int, str] = {
-    1: 'A',
-    2: 'B',
-    3: 'C',
-    4: 'D',
-    5: 'E',
-    6: 'F',
-    7: 'G',
-    8: 'H',
-    9: 'I'
-}
 
 
 class LyDict(TypedDict):

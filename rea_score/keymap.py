@@ -7,6 +7,8 @@ keymap = {
     # staves
     "[": 'set_staff_of_selected_notes(1)',
     "]": 'set_staff_of_selected_notes(2)',
+    "{": 'set_staff_change_of_selected_notes(1)',
+    "}": 'set_staff_change_of_selected_notes(2)',
     # clefs
     't': 'set_clef_of_selected_notes(Clef.treble)',
     'T': 'set_clef_of_selected_notes(Clef.tenor)',

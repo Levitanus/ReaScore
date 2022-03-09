@@ -1,4 +1,4 @@
-from rea_score.primitives import Attachment, Clef, Event, NotationEvent, NotationPitch, Pitch, TupletRate
+from rea_score.primitives import ALPHABET, Attachment, Clef, Event, NotationEvent, NotationPitch, Pitch, TupletRate
 from rea_score.scale import Accidental
 
 
@@ -34,9 +34,6 @@ class NotationAccidental(NotationPitch, token='accidental'):
         )
 
 
-# d['accidental'] = NotationAccidental
-
-
 class NotationVoice(NotationPitch, token='voice'):
 
     def __init__(self, pitch: Pitch, voice: int) -> None:
@@ -63,9 +60,6 @@ class NotationVoice(NotationPitch, token='voice'):
 
     def __repr__(self) -> str:
         return f'<NotationVoice {self.pitch}, voice:{self.voice}>'
-
-
-# d['voice'] = NotationVoice
 
 
 class NotationStaff(NotationPitch, token='staff'):
@@ -96,7 +90,35 @@ class NotationStaff(NotationPitch, token='staff'):
         return f'<NotationStaff {self.pitch}, staff:{self.staff}>'
 
 
-# d['staff'] = NotationStaff
+class NotationStaffChange(NotationPitch, Attachment, token='staff_change'):
+
+    def __init__(self, pitch: Pitch, staff: int) -> None:
+        super().__init__(pitch)
+        self.staff = staff
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return f'\\change Staff = "Staff{ALPHABET[self.staff]}"'
+
+    @property
+    def for_midi(self) -> str:
+        return f'staff_change:{self.staff}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationStaffChange':
+        return NotationStaffChange(pitch, int(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.staff = new.staff
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationStaffChange {self.pitch}, staff_change:{self.staff}>'
 
 
 class NotationClef(NotationPitch, token='clef'):
@@ -127,9 +149,6 @@ class NotationClef(NotationPitch, token='clef'):
         return f'<NotationClef {self.pitch}, clef:{self.clef}>'
 
 
-# d['clef'] = NotationClef
-
-
 class NotationGhost(NotationPitch, Attachment, token='ghost'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -158,9 +177,6 @@ class NotationGhost(NotationPitch, Attachment, token='ghost'):
         return f'<NotationGhost {self.pitch}>'
 
 
-# d['ghost'] = NotationGhost
-
-
 class NotationTrill(NotationPitch, Attachment, token='trill'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -187,9 +203,6 @@ class NotationTrill(NotationPitch, Attachment, token='trill'):
 
     def __repr__(self) -> str:
         return f'<NotationTrill {self.pitch}>'
-
-
-# d['trill'] = NotationTrill
 
 
 class NotationTrem(NotationPitch, token='trem'):
@@ -223,9 +236,6 @@ class NotationTrem(NotationPitch, token='trem'):
         return f'<NotationTrem {self.pitch}, {self.trem_denom}>'
 
 
-# d['trem'] = NotationTrem
-
-
 class NotationIgnore(NotationPitch, token='ignore'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -254,9 +264,6 @@ class NotationIgnore(NotationPitch, token='ignore'):
 
     def __repr__(self) -> str:
         return f'<NotationIgnore {self.pitch}>'
-
-
-# d['ignore'] = NotationIgnore
 
 
 class NotationTupletBegin(NotationPitch, Attachment, token='tuplet_begin'):
@@ -292,9 +299,6 @@ class NotationTupletBegin(NotationPitch, Attachment, token='tuplet_begin'):
         return f'<NotationTupletBegin {self.pitch}, tuplet:{self.rate}>'
 
 
-# d['tuplet_begin'] = NotationTupletBegin
-
-
 class NotationTupletEnd(NotationPitch, Attachment, token='tuplet_end'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -321,6 +325,3 @@ class NotationTupletEnd(NotationPitch, Attachment, token='tuplet_end'):
 
     def __repr__(self) -> str:
         return f'<NotationTupletEnd {self.pitch}>'
-
-
-# d['tuplet_end'] = NotationTupletEnd

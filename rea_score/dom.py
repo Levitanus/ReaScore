@@ -6,12 +6,13 @@ from reapy_boost.core.item.midi_event import MIDIEventDict
 
 from rea_score.primitives import (
     Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
-    NotationMarker, NotationPitch, NotationEvent, NotationText,
-    NotationTimeSignature, Pitch, Position, Fractured, TimeSignature, Tuplet
+    NotationMarker, NotationPitch, NotationEvent, Pitch, Position, Fractured,
+    TimeSignature, Tuplet
 )
 from rea_score.notations_pitch import (
     NotationIgnore, NotationTupletBegin, NotationTupletEnd
 )
+from rea_score.notation_events import NotationText, NotationTimeSignature
 
 from pprint import pformat, pprint
 

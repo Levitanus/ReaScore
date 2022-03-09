@@ -12,13 +12,14 @@ from typing import List, Optional, Union, cast
 
 from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    Clef, NotationEvent, NotationKeySignature, NotationMarker, NotationPitch,
-    Pitch
+    Clef, NotationEvent, NotationMarker, NotationPitch, Pitch
 )
 from rea_score.notations_pitch import (
     NotationAccidental, NotationClef, NotationGhost, NotationIgnore,
-    NotationTrem, NotationTrill, NotationVoice, NotationStaff
+    NotationStaffChange, NotationTrem, NotationTrill, NotationVoice,
+    NotationStaff
 )
+from rea_score.notation_events import NotationKeySignature
 
 from rea_score.scale import Accidental, Key, Scale
 
@@ -425,6 +426,20 @@ def set_staff_of_selected_notes(staff: int) -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('set_staff_change_of_selected_notes')
+def set_staff_change_of_selected_notes(staff: int) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))
+    NotationPitchInspector().set(
+        editor.take, list(selected), [NotationStaffChange(Pitch(127), staff)]
     )
 
 
