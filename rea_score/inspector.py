@@ -12,9 +12,12 @@ from typing import List, Optional, Union, cast
 
 from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    Clef, NotationAccidental, NotationClef, NotationEvent, NotationGhost,
-    NotationIgnore, NotationKeySignature, NotationMarker, NotationPitch,
-    NotationTrem, NotationTrill, NotationVoice, NotationStaff, Pitch
+    Clef, NotationEvent, NotationKeySignature, NotationMarker, NotationPitch,
+    Pitch
+)
+from rea_score.notations_pitch import (
+    NotationAccidental, NotationClef, NotationGhost, NotationIgnore,
+    NotationTrem, NotationTrill, NotationVoice, NotationStaff
 )
 
 from rea_score.scale import Accidental, Key, Scale

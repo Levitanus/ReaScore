@@ -4,11 +4,13 @@ from typing import Dict, Iterable, Iterator, List, Optional, TypeVar, Union
 import reapy_boost as rpr
 from reapy_boost.core.item.midi_event import MIDIEventDict
 
-from .primitives import (
+from rea_score.primitives import (
     Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
-    NotationIgnore, NotationMarker, NotationPitch, NotationEvent, NotationText,
-    NotationTimeSignature, NotationTupletBegin, NotationTupletEnd, Pitch,
-    Position, Fractured, TimeSignature, Tuplet
+    NotationMarker, NotationPitch, NotationEvent, NotationText,
+    NotationTimeSignature, Pitch, Position, Fractured, TimeSignature, Tuplet
+)
+from rea_score.notations_pitch import (
+    NotationIgnore, NotationTupletBegin, NotationTupletEnd
 )
 
 from pprint import pformat, pprint
@@ -273,7 +275,12 @@ class Voice:
 
 class Staff:
 
-    def __init__(self, staff_nr: int, clef: Optional[Clef] = None) -> None:
+    def __init__(
+        self,
+        staff_nr: int,
+        clef: Optional[Clef] = None,
+        parallel: bool = True
+    ) -> None:
         self.staff_nr = staff_nr
         self.voices: List[Voice] = []
         if clef is None:
@@ -282,6 +289,7 @@ class Staff:
             else:
                 clef = Clef.treble
         self.clef = clef
+        self.parallel = parallel
 
     def __repr__(self) -> str:
         return "<Staff {nr}, clef: {clef}, {voices}>".format(

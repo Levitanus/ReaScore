@@ -15,6 +15,7 @@ from .scale import Accidental, ENHARM_ACC, Scale, midi_to_note, Key
 LIMIT_DENOMINATOR = 128
 PITCH_IS_CHORD = 12800
 PITCH_IS_TUPLET = 12801
+PITCH_IS_VOICESPLIT = 12802
 ROUND_QUARTERS = 4
 
 
@@ -452,6 +453,11 @@ class NotationTimeSignature(NotationEvent, Attachment):
 
 class NotationPitch(NotationEvent):
 
+    _tokens: ty.Dict[str, ty.Type['NotationPitch']] = {}
+
+    def __init_subclass__(cls, token: str) -> None:
+        NotationPitch._tokens[token] = cls
+
     def __init__(self, pitch: Pitch) -> None:
         super().__init__()
         self.pitch = pitch
@@ -484,22 +490,26 @@ class NotationPitch(NotationEvent):
     @classmethod
     def from_token(cls, token: str,
                    pitch: Pitch) -> ty.Optional['NotationPitch']:
-        if token.startswith('accidental'):
-            return NotationAccidental.from_midi(pitch, token)
-        if token.startswith('voice'):
-            return NotationVoice.from_midi(pitch, token)
-        if token.startswith('staff'):
-            return NotationStaff.from_midi(pitch, token)
-        if token.startswith('clef'):
-            return NotationClef.from_midi(pitch, token)
-        if token.startswith('ghost'):
-            return NotationGhost.from_midi(pitch, token)
-        if token.startswith('trill'):
-            return NotationTrill.from_midi(pitch, token)
-        if token.startswith('trem'):
-            return NotationTrem.from_midi(pitch, token)
-        if token.startswith('ignore'):
-            return NotationIgnore.from_midi(pitch, token)
+        token_orig = token
+        token = token.split(':')[0]
+        if token in cls._tokens:
+            return cls._tokens[token].from_midi(pitch, token_orig)
+        # if token.startswith('accidental'):
+        #     return NotationAccidental.from_midi(pitch, token)
+        # if token.startswith('voice'):
+        #     return NotationVoice.from_midi(pitch, token)
+        # if token.startswith('staff'):
+        #     return NotationStaff.from_midi(pitch, token)
+        # if token.startswith('clef'):
+        #     return NotationClef.from_midi(pitch, token)
+        # if token.startswith('ghost'):
+        #     return NotationGhost.from_midi(pitch, token)
+        # if token.startswith('trill'):
+        #     return NotationTrill.from_midi(pitch, token)
+        # if token.startswith('trem'):
+        #     return NotationTrem.from_midi(pitch, token)
+        # if token.startswith('ignore'):
+        #     return NotationIgnore.from_midi(pitch, token)
         return None
 
     @classmethod
@@ -800,207 +810,43 @@ class Tuplet(Event):
         self.length.length += event.length.length
 
 
-class NotationAccidental(NotationPitch):
+class VoiceSplit(Event):
 
-    def __init__(self, pitch: Pitch, accidental: Accidental) -> None:
-        super().__init__(pitch)
-        self.accidental = accidental
-
-    def apply_to_event(self, event: Event) -> None:
-        event.pitch.accidental = self.accidental
-
-    @property
-    def for_midi(self) -> str:
-        return 'accidental:' + self.accidental.to_str()
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationAccidental':
-        return NotationAccidental(
-            pitch, Accidental.from_str(string.split(':')[1])
+    def __init__(
+        self,
+        length: Length,
+        pitch: ty.Optional[Pitch] = None,
+        voice_nr: int = 1,
+        staff_nr: int = 1,
+        prefix: ty.Optional[ty.List[Attachment]] = None,
+        postfix: ty.Optional[ty.List[Attachment]] = None,
+        event_lists: ty.Optional[ty.List[ty.List[Event]]] = None,
+    ) -> None:
+        super().__init__(
+            length,
+            Pitch(PITCH_IS_TUPLET),
+            voice_nr,
+            staff_nr,
+            prefix,
+            postfix,
         )
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.accidental = new.accidental
-        return True
-
-    def __repr__(self) -> str:
-        return '<NotationAccidental {}, accidental:{}>'.format(
-            self.pitch, self.accidental.to_str()
-        )
-
-
-class NotationVoice(NotationPitch):
-
-    def __init__(self, pitch: Pitch, voice: int) -> None:
-        super().__init__(pitch)
-        self.voice = voice
-
-    def apply_to_event(self, event: Event) -> None:
-        event.voice_nr = self.voice
+        if event_lists is None:
+            event_lists = []
+        self._event_lists = event_lists
 
     @property
-    def for_midi(self) -> str:
-        return f'voice:{self.voice}'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationVoice':
-        return NotationVoice(pitch, int(string.split(':')[1]))
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.voice = new.voice
-        return True
+    def _params(
+        self
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment],
+                  ty.List[Attachment], ty.List[Event]]:
+        return (*super()._params, self.events)
 
     def __repr__(self) -> str:
-        return f'<NotationVoice {self.pitch}, voice:{self.voice}>'
-
-
-class NotationStaff(NotationPitch):
-
-    def __init__(self, pitch: Pitch, staff: int) -> None:
-        super().__init__(pitch)
-        self.staff = staff
-
-    def apply_to_event(self, event: Event) -> None:
-        event.staff_nr = self.staff
+        return f"<VoiceSplit {pformat(self._params, indent=4)}>"
 
     @property
-    def for_midi(self) -> str:
-        return f'staff:{self.staff}'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationStaff':
-        return NotationStaff(pitch, int(string.split(':')[1]))
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.staff = new.staff
-        return True
-
-    def __repr__(self) -> str:
-        return f'<NotationStaff {self.pitch}, staff:{self.staff}>'
-
-
-class NotationClef(NotationPitch):
-
-    def __init__(self, pitch: Pitch, clef: Clef) -> None:
-        super().__init__(pitch)
-        self.clef = clef
-
-    def apply_to_event(self, event: Event) -> None:
-        event.prefix.append(self.clef)
-
-    @property
-    def for_midi(self) -> str:
-        return f'clef:{self.clef.value}'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationClef':
-        return NotationClef(pitch, Clef(string.split(':')[1]))
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.clef = new.clef
-        return True
-
-    def __repr__(self) -> str:
-        return f'<NotationClef {self.pitch}, clef:{self.clef}>'
-
-
-class NotationGhost(NotationPitch, Attachment):
-
-    def __init__(self, pitch: Pitch) -> None:
-        super().__init__(pitch)
-
-    def apply_to_event(self, event: Event) -> None:
-        event.prefix.append(self)
-
-    def ly_render(self) -> str:
-        return '\\parenthesize'
-
-    @property
-    def for_midi(self) -> str:
-        return f'ghost'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationGhost':
-        return NotationGhost(pitch)
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        return super().update(new)
-
-    def __repr__(self) -> str:
-        return f'<NotationGhost {self.pitch}>'
-
-
-class NotationTrill(NotationPitch, Attachment):
-
-    def __init__(self, pitch: Pitch) -> None:
-        super().__init__(pitch)
-
-    def apply_to_event(self, event: Event) -> None:
-        event.postfix.append(self)
-
-    def ly_render(self) -> str:
-        return '\\trill'
-
-    @property
-    def for_midi(self) -> str:
-        return f'trill'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTrill':
-        return NotationTrill(pitch)
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        return super().update(new)
-
-    def __repr__(self) -> str:
-        return f'<NotationTrill {self.pitch}>'
-
-
-class NotationTrem(NotationPitch):
-
-    def __init__(self, pitch: Pitch, trem_denom: int) -> None:
-        super().__init__(pitch)
-        self.trem_denom = trem_denom
-
-    def apply_to_event(self, event: Event) -> None:
-        event.length.trem_denom = self.trem_denom
-
-    def ly_render(self) -> str:
-        return f':{self.trem_denom}'
-
-    @property
-    def for_midi(self) -> str:
-        return f'trem:{self.trem_denom}'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTrem':
-        return NotationTrem(pitch, int(string.split(':')[1]))
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.trem_denom = new.trem_denom
-        return True
-
-    def __repr__(self) -> str:
-        return f'<NotationTrem {self.pitch}, {self.trem_denom}>'
+    def events(self) -> ty.List[Event]:
+        return zip(self._events_lists)
 
 
 class NotationText(NotationEvent, Attachment):
@@ -1037,94 +883,3 @@ class NotationText(NotationEvent, Attachment):
 
     def __repr__(self) -> str:
         return f'<NotationText "{self.text}">'
-
-
-class NotationIgnore(NotationPitch):
-
-    def __init__(self, pitch: Pitch) -> None:
-        super().__init__(pitch)
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, NotationIgnore):
-            return self.pitch == other.pitch
-        return False
-
-    def apply_to_event(self, event: Event) -> None:
-        event.prefix.append(self)
-
-    @property
-    def for_midi(self) -> str:
-        return f'ignore'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationIgnore':
-        return NotationIgnore(pitch)
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        return super().update(new)
-
-    def __repr__(self) -> str:
-        return f'<NotationIgnore {self.pitch}>'
-
-
-class NotationTupletBegin(NotationPitch, Attachment):
-
-    def __init__(self, pitch: Pitch, rate: TupletRate) -> None:
-        super().__init__(pitch)
-        self.rate = rate
-
-    def apply_to_event(self, event: Event) -> None:
-        event.prefix.append(self)
-
-    def ly_render(self) -> str:
-        return f'\\tuplet {self.rate.to_str()}{{'
-
-    @property
-    def for_midi(self) -> str:
-        return f'tuplet_begin:{self.rate.to_str()}'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletBegin':
-        return NotationTupletBegin(
-            pitch, TupletRate.from_str(string.split(':')[1])
-        )
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        super().update(new)
-        self.tuplet = new.tuplet
-        return True
-
-    def __repr__(self) -> str:
-        return f'<NotationTupletBegin {self.pitch}, tuplet:{self.rate}>'
-
-
-class NotationTupletEnd(NotationPitch, Attachment):
-
-    def __init__(self, pitch: Pitch) -> None:
-        super().__init__(pitch)
-
-    def apply_to_event(self, event: Event) -> None:
-        event.postfix.append(self)
-
-    def ly_render(self) -> str:
-        return f'}}'
-
-    @property
-    def for_midi(self) -> str:
-        return f'tuplet_end'
-
-    @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletEnd':
-        return NotationTupletEnd(pitch)
-
-    def update(self, new: NotationEvent) -> bool:
-        if not isinstance(new, self.__class__):
-            return False
-        return super().update(new)
-
-    def __repr__(self) -> str:
-        return f'<NotationTupletEnd {self.pitch}>'
