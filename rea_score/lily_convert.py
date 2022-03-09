@@ -85,7 +85,8 @@ def render_part(
 
 
 _staff_definition = """{voice_defs}\n{var} = <<{clef} {voice_vars} >>"""
-_staff_expression = """\\new {staff_str} {{\\{var}}}"""
+_staff_expression = """\\new {staff_str} = "{staff_name}" {staff_params} {{\\{var}}}"""
+_staff_params = """\\with {{{staff_params}}}"""
 
 
 def render_staff(
@@ -119,8 +120,14 @@ def render_staff(
     else:
         var = f'Staff{litera}'
 
+    staff_params = []
     voice_defs = []
     voice_expressions = []
+    if len(staff) == 2:
+        combine = '\\partCombine '
+        staff_params.append('printPartCombineTexts = ##f')
+    else:
+        combine = ''
     for voice in staff:
         voice_dict = render_voice(
             voice,
@@ -137,18 +144,25 @@ def render_staff(
             voice_defs='\n'.join(voice_defs),
             var=var,
             clef=staff.clef.ly_render(),
-            voice_vars="\n".join(voice_expressions),
+            voice_vars=combine + " ".join(voice_expressions),
         ),
-        expression=_staff_expression.format(staff_str=staff_str, var=var)
+        expression=_staff_expression.format(
+            staff_str=staff_str,
+            staff_name=var,
+            var=var,
+            staff_params=_staff_params.format(
+                staff_params='\n'.join(staff_params)
+            )
+        )
     )
 
 
 _voice_definition = """\
 {var} =  {mode} {{
-    \\{voice_str} {events}
+    {voice_str} {events}
 }}
 """
-_voice_expression = """\\new {voice_def} = \"{litera}\" {{\\{var}}}"""
+_voice_expression = """\\{var}"""
 
 
 def render_voice(
@@ -161,19 +175,24 @@ def render_voice(
     # print(f"finalizing voice {voice}")
     key = KEY
     voice = voice.finalized()
-    voice_str = voice.voice_str
+    print(voice.globals)
+    voice_str = ''
+    if index != 1:
+        voice_str = voice.voice_str
     voicedef = 'Voice'
 
     mode = ''
     if track_type in (
         TrackType.drums, TrackType.one_line_perc, TrackType.bongos
     ):
-        voice_str = 'stemUp' if index == 1 else 'stemDown'
+        # voice_str = 'stemUp' if index == 1 else 'stemDown'
+        if index != 1:
+            voice_str = 'stemDown'
         voicedef = 'DrumVoice'
         mode = '\\drummode'
 
     litera = ALPHABET[index]
-    var = f'Voice{litera}'
+    var = f'\\Voice{litera}'
     if name:
         var = name
 
@@ -183,12 +202,20 @@ def render_voice(
         event_str, key = render_any_event(event, key, octave_offset)
         out.append(event_str)
     # key = KEY.ly_render()
+    if voice_str:
+        voice_str = '\\' + voice_str
     return LyDict(
         definition=_voice_definition.format(
-            var=var, mode=mode, voice_str=voice_str, events=' '.join(out)
+            var=var,
+            mode=mode,
+            voice_str=voice_str,
+            # voice_str="",
+            events=' '.join(out),
         ),
         expression=_voice_expression.format(
-            voice_def=voicedef, litera=litera, var=var
+            voice_def=voicedef,
+            litera=litera,
+            var=var,
         ),
         var=var,
     )
@@ -298,15 +325,20 @@ def render_length(length: Length, rest: bool = False) -> Tuple[str, str]:
     bar = '' if not length.bar_multiplier else f'*{length.bar_multiplier}'
     if rest:
         tie = ' r'
+        if length.full_bar:
+            tie = ' R'
     for idx, lth in enumerate(reversed(length.normalized(length.fraction))):
         if idx == 0:
-            if lth > 1:
-                f_lth = '1'
-                tied += fraction_to_length(lth - 1) + trem + bar
-            else:
-                f_lth = fraction_to_length(lth) + trem + bar
+            # COMMENTED BECAUSE BAR CAN BE LONGER THEN 1, WAIT FOR BUGS
+            # if lth > 1:
+            #     f_lth = '1'
+            #     tied += tie + fraction_to_length(lth - 1) + trem + bar
+            # else:
+            #     f_lth = fraction_to_length(lth) + trem + bar
+            f_lth = fraction_to_length(lth) + trem + bar
         else:
             tied += tie + fraction_to_length(lth) + trem + bar
+        # print(idx, lth, f_lth, tied, sep=', ')
     return f_lth, tied
 
 
@@ -326,7 +358,7 @@ def fraction_to_length(frac: Fraction) -> str:
         denom = str(frac.denominator)
     else:
         raise FracError(f"no right condition {frac}")
-    # print(frac)
+    # print(frac, denom, num)
     return denom + num
 
 

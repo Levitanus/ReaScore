@@ -198,8 +198,8 @@ class TrackInspector:
 
     def notations_at_start(self) -> List[NotationEvent]:
         notations: List[NotationEvent] = []
-        if clef := self.clef:
-            notations.append(NotationClef(Pitch(), clef))
+        # if clef := self.clef:
+        #     notations.append(NotationClef(Pitch(), clef))
         return notations
 
     @property
@@ -307,6 +307,8 @@ class TrackInspector:
         staves = split_by_staff(events)
         for staff in staves:
             # print(f'apply global events to staff {staff.staff_nr}')
+            if (clef := self.clef) is not Clef.treble:
+                staff.clef = clef
             staff.apply_global_events(global_events)
         # print(staves)
         # print('render part')

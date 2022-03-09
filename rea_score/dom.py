@@ -314,6 +314,9 @@ class Staff:
         for voice in self.voices:
             yield voice
 
+    def __len__(self) -> int:
+        return len(self.voices)
+
 
 def get_time_signature_betveen_bounds(
     begin_s: float, end_s: float
