@@ -5,12 +5,13 @@ import reapy_boost as rpr
 from reapy_boost.core.item.midi_event import MIDIEventDict
 
 from rea_score.primitives import (
-    Attachment, Chord, Clef, Event, GlobalNotationEvent, Length,
+    Attachment, Chord, Clef, Event, GlobalNotationEvent, Grace, Length,
     NotationMarker, NotationPitch, NotationEvent, Pitch, Position, Fractured,
     TimeSignature, Tuplet
 )
 from rea_score.notations_pitch import (
-    NotationIgnore, NotationTupletBegin, NotationTupletEnd
+    NotationGraceBegin, NotationGraceEnd, NotationIgnore, NotationTupletBegin,
+    NotationTupletEnd
 )
 from rea_score.notation_events import NotationText, NotationTimeSignature
 
@@ -47,6 +48,28 @@ class EventPackager:
     def append(self, event: Event) -> None:
         if event.length == 0:
             return
+        if self.voice._grace and not self.voice._grace_opened:
+            event.prefix.append(self.voice._grace)
+            # print('grace to event:', event)
+            self.voice._grace = None
+        grace_opened = self.voice._grace_opened
+        for notation in event.prefix:
+            if isinstance(notation, NotationGraceBegin):
+                self.voice._grace = Grace()
+                self.voice._grace_opened = True
+                grace_opened = True
+                # print('opened grace with:', event)
+        if self.voice._grace_opened and self.voice._grace:
+            event.length = Length.from_fraction(1 / 8)
+            self.voice._grace.append(event)
+        for notation in event.postfix:
+            if isinstance(notation, NotationGraceEnd):
+                # print('close grace')
+                self.voice._grace_opened = False
+        if grace_opened:
+            # print('grace opened, return')
+            return
+
         if self.key not in self.voice.events:
             if self.key.bar_position == 0:
                 barcheck = BarCheck(self.key.bar)
@@ -93,6 +116,8 @@ class Voice:
         self.voice_nr = voice_nr
         self.events: Dict[Position, Event] = {}
         self.globals: Dict[Position, List[NotationEvent]] = {}
+        self._grace: Optional[Grace] = None
+        self._grace_opened: bool = False
 
     @property
     def voice_str(self) -> str:
@@ -404,9 +429,13 @@ def notes_from_take(
         start = take.ppq_to_beat(info['ppq_position'])
         end = take.ppq_to_beat(info['ppq_end'])
         pos = Position(start)
+
+        voice_nr = info['channel'] + 1
         if pos not in events:
             events[pos] = []
-        events[pos].append(Event(Length(end - start), pitch))
+        events[pos].append(
+            Event(Length(end - start), pitch, voice_nr=voice_nr)
+        )
     return events
 
 

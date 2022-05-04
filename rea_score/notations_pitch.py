@@ -1,4 +1,6 @@
-from rea_score.primitives import ALPHABET, Attachment, Clef, Event, NotationEvent, NotationPitch, Pitch, TupletRate
+from enum import Enum
+from typing import Optional
+from rea_score.primitives import ALPHABET, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch, Pitch, TupletRate
 from rea_score.scale import Accidental
 
 
@@ -325,3 +327,95 @@ class NotationTupletEnd(NotationPitch, Attachment, token='tuplet_end'):
 
     def __repr__(self) -> str:
         return f'<NotationTupletEnd {self.pitch}>'
+
+
+class NotationGraceBegin(NotationPitch, Attachment, token='grace_begin'):
+
+    def __init__(
+        self, pitch: Pitch, grace_type: GraceType = GraceType.grace
+    ) -> None:
+        super().__init__(pitch)
+        self.grace_type = grace_type
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return f'\\{self.grace_type.value}{{'
+
+    @property
+    def for_midi(self) -> str:
+        return f'grace_begin:{self.grace_type.value}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationGraceBegin':
+        return NotationGraceBegin(pitch, GraceType(string.split(':')[1]))
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.grace_type = new.grace_type
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationGraceBegin {self.pitch}, grace_type:{self.grace_type}>'
+
+
+class NotationGraceEnd(NotationPitch, Attachment, token='grace_end'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'}}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'grace_end'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationGraceEnd':
+        return NotationGraceEnd(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationGraceEnd {self.pitch}>'
+
+
+class NotationDynamics(NotationPitch, Attachment, token='dyn'):
+
+    def __init__(self, pitch: Pitch, dynamics: str) -> None:
+        super().__init__(pitch)
+        self.dynamics = dynamics
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'\\{self.dynamics}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'dyn:{self.dynamics}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationDynamics':
+        return NotationDynamics(pitch, string.split(':')[1])
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.dynamics = new.dynamics
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationDynamics {self.pitch}, dyn:{self.dynamics}>'

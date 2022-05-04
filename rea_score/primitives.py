@@ -16,6 +16,7 @@ LIMIT_DENOMINATOR = 128
 PITCH_IS_CHORD = 12800
 PITCH_IS_TUPLET = 12801
 PITCH_IS_VOICESPLIT = 12802
+PITCH_IS_GRACE = 12803
 ROUND_QUARTERS = 4
 
 ALPHABET: ty.Dict[int, str] = {
@@ -502,19 +503,19 @@ class NotationPitch(NotationEvent):
         string = bytes(buf[2:]).decode('latin-1')
         if not NotationPitch.is_reascore_event_buf(buf):
             raise ValueError(f'Not a ReaScore notation event: {string}')
-        # print(string)
+        print(string)
         tokens = cls.reascore_tokens(string)
         if m := re.match(r'NOTE\s\d+\s(\d+)', string):
             pitch = Pitch(int(m.groups()[0]))
         else:
             raise ValueError(f'Can not get pitch from string: {string}')
         events = []
-        # print(tokens)
+        print(tokens, pitch)
         for token in tokens[1:]:
             event = NotationPitch.from_token(token, pitch)
             if event is not None:
                 events.append(event)
-            # print(token, event)
+            print(token, event)
         return events
 
     @classmethod
@@ -522,6 +523,7 @@ class NotationPitch(NotationEvent):
         cls,
         events: ty.List['NotationPitch'],
         check_pitch: ty.Optional[Pitch] = None,
+        channel: int = 0,
         original_buf: ty.Optional[ty.List[int]] = None,
     ) -> ty.List[int]:
         pitch = ty.cast(Pitch, check_pitch)
@@ -549,7 +551,7 @@ class NotationPitch(NotationEvent):
             else:
                 string += tokens_str
         else:
-            string = f"NOTE 0 {pitch.midi_pitch}{tokens_str}"
+            string = f"NOTE {channel} {pitch.midi_pitch}{tokens_str}"
         return [
             0xff,
             0x0f,
@@ -773,9 +775,61 @@ class Tuplet(Event):
     def append(self, event: Event) -> None:
         if event.length == 0:
             return
-        self.postfix = event.postfix
+        self.postfix = event.postfix  # should be used extend instead?
         self._events.append(event)
         self.length.length += event.length.length
+
+
+class GraceType(Enum):
+    grace = 'grace'
+    acciaccatura = 'acciaccatura'
+    appoggiatura = 'appoggiatura'
+    slashedGrace = 'slashedGrace'
+
+
+class Grace(Event, Attachment):
+
+    def __init__(
+        self,
+        length: Length = Length(0),
+        pitch: ty.Optional[Pitch] = None,
+        voice_nr: int = 1,
+        staff_nr: int = 1,
+        prefix: ty.Optional[ty.List[Attachment]] = None,
+        postfix: ty.Optional[ty.List[Attachment]] = None,
+        grace_type: GraceType = GraceType.grace,
+        events: ty.Optional[ty.List[Event]] = None,
+    ) -> None:
+        super().__init__(
+            length,
+            Pitch(PITCH_IS_GRACE),
+            voice_nr,
+            staff_nr,
+            prefix,
+            postfix,
+        )
+        self.grace_type = grace_type
+        self._events = events or []
+
+    @property
+    def _params(
+        self
+    ) -> ty.Tuple[Length, Pitch, int, int, ty.List[Attachment],
+                  ty.List[Attachment], GraceType, ty.List[Event]]:
+        return (*super()._params, self.grace_type, self.events)
+
+    def __repr__(self) -> str:
+        return f"<Grace {self.grace_type} {pformat(self._params, indent=4)}>"
+
+    def append(self, event: Event) -> None:
+        if event.length == 0:
+            return
+        # self.postfix = event.postfix  # should be used extend instead?
+        self._events.append(event)
+
+    @property
+    def events(self) -> ty.List[Event]:
+        return self._events
 
 
 class VoiceSplit(Event):

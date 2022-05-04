@@ -12,12 +12,12 @@ from typing import List, Optional, Union, cast
 
 from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (
-    Clef, NotationEvent, NotationMarker, NotationPitch, Pitch
+    Clef, GraceType, NotationEvent, NotationMarker, NotationPitch, Pitch
 )
 from rea_score.notations_pitch import (
-    NotationAccidental, NotationClef, NotationGhost, NotationIgnore,
-    NotationStaffChange, NotationTrem, NotationTrill, NotationVoice,
-    NotationStaff
+    NotationAccidental, NotationClef, NotationDynamics, NotationGhost,
+    NotationGraceBegin, NotationGraceEnd, NotationIgnore, NotationStaffChange,
+    NotationTrem, NotationTrill, NotationVoice, NotationStaff
 )
 from rea_score.notation_events import NotationKeySignature
 
@@ -83,6 +83,9 @@ class ProjectInspector:
             )
             return None
         return None if key not in state else state[key]  # type:ignore
+
+    def ask_for_dynamics(self) -> str:
+        ...
 
     @property
     def temp_pdf(self) -> Path:
@@ -344,6 +347,7 @@ class NotationPitchInspector:
         )
         for note in notes:
             infos = note.infos
+            channel = infos['channel']
             ppq = infos['ppq_position']
             pitch = infos['pitch']
             note_events = deepcopy(events)
@@ -371,7 +375,7 @@ class NotationPitchInspector:
                 )
                 note_events = parced
             buf = NotationPitch.to_midi_buf(
-                note_events, Pitch(pitch), original_buf
+                note_events, Pitch(pitch), channel, original_buf
             )
 
             event = rpr.MIDIEventDict(
@@ -416,6 +420,19 @@ def set_voice_of_selected_notes(voice: int) -> None:
 
 
 @rpr.inside_reaper()
+@rpr.undo_block('set_channel_of_selected_notes')
+def set_channel_of_selected_notes(channel: int) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    for note in selected:
+        note.channel = channel
+
+
+@rpr.inside_reaper()
 @rpr.undo_block('set_staff_of_selected_notes')
 def set_staff_of_selected_notes(staff: int) -> None:
     ptr = RPR.MIDIEditor_GetActive()  # type:ignore
@@ -454,6 +471,23 @@ def set_clef_of_selected_notes(clef: Clef) -> None:
     selected = list(filter(lambda note: note.selected, notes))[0]
     NotationPitchInspector().set(
         editor.take, [selected], [NotationClef(Pitch(127), clef)]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('add_dynamics_at_selected_note')
+def add_dynamics_at_selected_note(dyn: str = '') -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))[0]
+    dynamics = dyn or rpr.get_user_inputs(
+        'type dynamics in lilypond format', ['dyn']
+    )['dyn']
+    NotationPitchInspector().set(
+        editor.take, [selected], [NotationDynamics(Pitch(127), dynamics)]
     )
 
 
@@ -535,3 +569,32 @@ def combine_items() -> None:
     aid = rpr.get_command_id("_RS309e578f9acca56952277d83109c5d09cf3d70c0")
     if aid:
         rpr, perform_action(aid)
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('grace_begin')
+def grace_begin(grace_type: GraceType) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))[0]
+    NotationPitchInspector().set(
+        editor.take, [selected],
+        [NotationGraceBegin(Pitch(127), grace_type=grace_type)]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('grace_end')
+def grace_end() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))[0]
+    NotationPitchInspector().set(
+        editor.take, [selected], [NotationGraceEnd(Pitch(127))]
+    )

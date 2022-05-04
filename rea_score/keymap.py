@@ -4,6 +4,10 @@ keymap = {
     "2": 'set_voice_of_selected_notes(2)',
     "3": 'set_voice_of_selected_notes(3)',
     "4": 'set_voice_of_selected_notes(4)',
+    "!": 'set_channel_of_selected_notes(0)',
+    "@": 'set_channel_of_selected_notes(1)',
+    "#": 'set_channel_of_selected_notes(2)',
+    "$": 'set_channel_of_selected_notes(3)',
     # staves
     "[": 'set_staff_of_selected_notes(1)',
     "]": 'set_staff_of_selected_notes(2)',
@@ -29,6 +33,13 @@ keymap = {
     's': 'spread_notes()',
     'v': 'view_score()',
     'c': 'combine_items()',
+    'e': 'add_dynamics_at_selected_note()',
+    'E': 'add_dynamics_at_selected_note("!")',
+    # grace
+    'g': 'grace_begin(GraceType.grace)',
+    'a': 'grace_begin(GraceType.acciaccatura)',
+    'A': 'grace_begin(GraceType.appoggiatura)',
+    'G': 'grace_end()',
 }
 
 funcmap = {v: k for k, v in keymap.items()}

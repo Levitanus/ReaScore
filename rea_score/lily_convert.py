@@ -8,8 +8,8 @@ from rea_score.notation_events import NotationKeySignature
 
 from .dom import Staff, StaffGroup, Voice, events_from_take, split_by_voice
 from .primitives import (
-    ALPHABET, Chord, Event, GlobalNotationEvent, Key, Length, Pitch, Position,
-    Scale, Tuplet, Clef
+    ALPHABET, Chord, Event, GlobalNotationEvent, Grace, Key, Length, Pitch,
+    Position, Scale, Tuplet, Clef
 )
 
 # import reapy_boost as rpr
@@ -247,7 +247,7 @@ def render_event(event: Event, key: Key, octave_offset: int) -> str:
     # if tied and tie:
     #     tie = ''
     return string.format(
-        prefix=render_prefix(event),
+        prefix=render_prefix(event, key, octave_offset),
         pitch=pitch,
         length=length,
         postfix=render_postfix(event),
@@ -267,7 +267,7 @@ def render_chord(chord: Chord, key: Key, octave_offset: int) -> str:
     else:
         tie = ''
     return string.format(
-        prefix=render_prefix(chord),
+        prefix=render_prefix(chord, key, octave_offset),
         pitches=' '.join(pitches),
         length=length,
         postfix=render_postfix(chord),
@@ -284,14 +284,35 @@ def render_tuplet(tuplet: Tuplet, key: Key,
         event_str, key = render_any_event(event, key, octave_offset)
         events_str.append(event_str)
     return string.format(
-        prefix=render_prefix(tuplet),
+        prefix=render_prefix(tuplet, key, octave_offset),
         rate=tuplet.rate.to_str(),
         events=' '.join(ev for ev in events_str)
     ), key
 
 
-def render_prefix(event: Event) -> str:
-    string = ' '.join(elm.ly_render() for elm in event.prefix)
+def render_grace(grace: Grace, key: Key, octave_offset: int) -> str:
+    string = "{prefix} {events} {postfix}"
+    events_str = []
+    for event in grace.events:
+        event_str, key = render_any_event(event, key, octave_offset)
+        events_str.append(event_str)
+    return string.format(
+        prefix=render_prefix(grace, key, octave_offset),
+        grace_type=grace.grace_type.value,
+        events=' '.join(ev for ev in events_str),
+        postfix=render_postfix(grace)
+    )
+
+
+def render_prefix(event: Event, key: Key, octave_offset: int) -> str:
+    elms = []
+    for elm in event.prefix:
+        if isinstance(elm, Grace):
+            # print(elm)
+            elms.append(render_grace(elm, key, octave_offset))
+        else:
+            elms.append(elm.ly_render())
+    string = ' '.join(elm for elm in elms)
     if string:
         return string + ' '
     else:
