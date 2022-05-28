@@ -1,7 +1,11 @@
 from enum import Enum
 from typing import Optional
-from rea_score.primitives import ALPHABET, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch, Pitch, TupletRate
+from rea_score.primitives import (
+    ALPHABET, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch,
+    Pitch, TupletRate
+)
 from rea_score.scale import Accidental
+import reapy_boost as rpr
 
 
 class NotationAccidental(NotationPitch, token='accidental'):
@@ -419,3 +423,101 @@ class NotationDynamics(NotationPitch, Attachment, token='dyn'):
 
     def __repr__(self) -> str:
         return f'<NotationDynamics {self.pitch}, dyn:{self.dynamics}>'
+
+
+class NotationXNoteBegin(NotationPitch, Attachment, token='x_begin'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return f'\\xNote{{'
+
+    @property
+    def for_midi(self) -> str:
+        return f'x_begin'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationXNoteBegin':
+        return NotationXNoteBegin(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationXNoteBegin {self.pitch}>'
+
+
+class NotationXNoteEnd(NotationPitch, Attachment, token='x_end'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'}}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'x_end'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationXNoteEnd':
+        return NotationXNoteEnd(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationXNoteEnd {self.pitch}>'
+
+
+class NotationArticulation(NotationPitch, Attachment, token='artic'):
+
+    def __init__(
+        self,
+        pitch: Pitch,
+        articulation: str = '',
+        position: str = '-'
+    ) -> None:
+        super().__init__(pitch)
+        self.articulation = articulation
+        self.position = position
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'{self.position}{self.articulation}'
+
+    @property
+    def for_midi(self) -> str:
+        return f'artic:{self.articulation}:{self.position}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationArticulation':
+        tokens = string.split(':')[1:3]
+        return NotationArticulation(pitch, *tokens)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.articulation = new.articulation
+        return True
+
+    def __repr__(self) -> str:
+        return (
+            f'<NotationArticulation {self.pitch},'
+            f' articulation:{self.articulation}>'
+        )

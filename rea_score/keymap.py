@@ -36,10 +36,16 @@ keymap = {
     'e': 'add_dynamics_at_selected_note()',
     'E': 'add_dynamics_at_selected_note("!")',
     # grace
+    # TODO: make one-hotkey
     'g': 'grace_begin(GraceType.grace)',
     'a': 'grace_begin(GraceType.acciaccatura)',
     'A': 'grace_begin(GraceType.appoggiatura)',
     'G': 'grace_end()',
+    # articulations
+    '-': 'add_articulation_to_selected_notes()',
+    '*': 'add_articulation_to_selected_notes(position="^")',
+    '/': 'add_articulation_to_selected_notes(position="_")',
+    'x': 'set_x_notes_to_selected()'
 }
 
 funcmap = {v: k for k, v in keymap.items()}

@@ -15,9 +15,10 @@ from rea_score.primitives import (
     Clef, GraceType, NotationEvent, NotationMarker, NotationPitch, Pitch
 )
 from rea_score.notations_pitch import (
-    NotationAccidental, NotationClef, NotationDynamics, NotationGhost,
-    NotationGraceBegin, NotationGraceEnd, NotationIgnore, NotationStaffChange,
-    NotationTrem, NotationTrill, NotationVoice, NotationStaff
+    NotationAccidental, NotationArticulation, NotationClef, NotationDynamics,
+    NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
+    NotationStaffChange, NotationTrem, NotationTrill, NotationVoice,
+    NotationStaff, NotationXNoteBegin, NotationXNoteEnd
 )
 from rea_score.notation_events import NotationKeySignature
 
@@ -597,4 +598,42 @@ def grace_end() -> None:
     selected = list(filter(lambda note: note.selected, notes))[0]
     NotationPitchInspector().set(
         editor.take, [selected], [NotationGraceEnd(Pitch(127))]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('set_x_notes_to_selected')
+def set_x_notes_to_selected(dyn: str = '') -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))
+    first, last = selected[0], selected[-1]
+    NotationPitchInspector().set(
+        editor.take, [first], [NotationXNoteBegin(Pitch(127))]
+    )
+    NotationPitchInspector().set(
+        editor.take, [last], [NotationXNoteEnd(Pitch(127))]
+    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('add_articulation_to_selected_notes')
+def add_articulation_to_selected_notes(
+    art: str = '', position: str = '-'
+) -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))
+    articulation = art or rpr.get_user_inputs(
+        'type articulation in lilypond format', ['art']
+    )['art']
+    NotationPitchInspector().set(
+        editor.take, selected,
+        [NotationArticulation(Pitch(127), articulation, position)]
     )

@@ -1,1 +1,3 @@
-from rea_score.reascripts import ReaScore_render_selected_track
+import reapy_boost as rpr
+
+rpr.configure_reaper()
