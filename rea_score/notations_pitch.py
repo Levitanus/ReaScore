@@ -537,6 +537,62 @@ class NotationXNoteEnd(NotationPitch, Attachment, token='x_end'):
 
     def __repr__(self) -> str:
         return f'<NotationXNoteEnd {self.pitch}>'
+    
+class NotationBeamGroupBegin(NotationPitch, Attachment, token='beam_begin'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f'['
+
+    @property
+    def for_midi(self) -> str:
+        return f'beam_begin'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationBeamGroupBegin':
+        return NotationBeamGroupBegin(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        return True
+
+    def __repr__(self) -> str:
+        return f'<NotationBeamGroupBegin {self.pitch}>'
+
+
+class NotationBeamGroupEnd(NotationPitch, Attachment, token='beam_end'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.postfix.append(self)
+
+    def ly_render(self) -> str:
+        return f']'
+
+    @property
+    def for_midi(self) -> str:
+        return f'beam_end'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationBeamGroupEnd':
+        return NotationBeamGroupEnd(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationBeamGroupEnd {self.pitch}>'
 
 
 class NotationArticulation(NotationPitch, Attachment, token='artic'):

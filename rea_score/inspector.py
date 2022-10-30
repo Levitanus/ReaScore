@@ -14,10 +14,11 @@ from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (Clef, GraceType, NotationEvent,
                                   NotationMarker, NotationPitch, Pitch)
 from rea_score.notations_pitch import (
-    NotationAccidental, NotationArticulation, NotationBeaming, NotationClef,
-    NotationDynamics, NotationGhost, NotationGraceBegin, NotationGraceEnd,
-    NotationIgnore, NotationSpacer, NotationStaffChange, NotationTrem,
-    NotationTrill, NotationUnnormalizedLength, NotationVoice, NotationStaff,
+    NotationAccidental, NotationArticulation, NotationBeamGroupBegin,
+    NotationBeamGroupEnd, NotationBeaming, NotationClef, NotationDynamics,
+    NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
+    NotationSpacer, NotationStaffChange, NotationTrem, NotationTrill,
+    NotationUnnormalizedLength, NotationVoice, NotationStaff,
     NotationXNoteBegin, NotationXNoteEnd)
 from rea_score.notation_events import NotationKeySignature
 
@@ -614,6 +615,22 @@ def set_x_notes_to_selected(dyn: str = '') -> None:
                                  [NotationXNoteBegin(Pitch(127))])
     NotationPitchInspector().set(editor.take, [last],
                                  [NotationXNoteEnd(Pitch(127))])
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('make_beam_group_from_selected_notes')
+def make_beam_group_from_selected_notes(dyn: str = '') -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))
+    first, last = selected[0], selected[-1]
+    NotationPitchInspector().set(editor.take, [first],
+                                 [NotationBeamGroupBegin(Pitch(127))])
+    NotationPitchInspector().set(editor.take, [last],
+                                 [NotationBeamGroupEnd(Pitch(127))])
 
 
 @rpr.inside_reaper()
