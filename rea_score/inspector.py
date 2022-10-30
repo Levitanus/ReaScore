@@ -11,9 +11,8 @@ from reapy_boost import reascript_api as RPR
 from typing import List, Optional, Union, cast
 
 from reapy_boost.core.item.midi_event import CCShapeFlag
-from rea_score.primitives import (
-    Clef, GraceType, NotationEvent, NotationMarker, NotationPitch, Pitch
-)
+from rea_score.primitives import (Clef, GraceType, NotationEvent,
+                                  NotationMarker, NotationPitch, Pitch)
 from rea_score.notations_pitch import (
     NotationAccidental, NotationArticulation, NotationClef, NotationDynamics,
     NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
@@ -24,10 +23,8 @@ from rea_score.notation_events import NotationKeySignature
 
 from rea_score.scale import Accidental, Key, Scale
 
-from .dom import (
-    events_from_take, get_global_events, split_by_staff, update_events,
-    TrackPitchType, TrackType
-)
+from .dom import (events_from_take, get_global_events, split_by_staff,
+                  update_events, TrackPitchType, TrackType)
 from .lily_convert import LyDict, render_staff
 from .lily_export import render
 from .keymap import keymap
@@ -79,9 +76,10 @@ class ProjectInspector:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
-            self.project.set_ext_state(
-                EXT_SECTION, 'main', state, pickled=True
-            )
+            self.project.set_ext_state(EXT_SECTION,
+                                       'main',
+                                       state,
+                                       pickled=True)
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -191,16 +189,17 @@ class TrackInspector:
     def state(self,
               key: str,
               value: Optional[object] = None) -> Optional[object]:
-        state = self.track.project.get_ext_state(
-            EXT_SECTION, self.guid, pickled=True
-        )
+        state = self.track.project.get_ext_state(EXT_SECTION,
+                                                 self.guid,
+                                                 pickled=True)
         if not state:
             state = {}
         if value is not None:
             state[key] = value  # type:ignore
-            self.track.project.set_ext_state(
-                EXT_SECTION, self.guid, state, pickled=True
-            )
+            self.track.project.set_ext_state(EXT_SECTION,
+                                             self.guid,
+                                             state,
+                                             pickled=True)
             return None
         return None if key not in state else state[key]  # type:ignore
 
@@ -245,18 +244,16 @@ class TrackInspector:
         if name := self.state('part_name'):
             return name  # type:ignore
         if rpr.show_message_box(
-            'Part name is not provided. Do You wish to use track name?',
-            'part name dialog', 'ok-cancel'
-        ) == 'ok':
+                'Part name is not provided. Do You wish to use track name?',
+                'part name dialog', 'ok-cancel') == 'ok':
             name = self.track.name
             self.state('part_name', name)
             return name
         else:
             try:
                 # print('getting part name')
-                name = rpr.get_user_inputs(
-                    'Please, provide part name:', ['part name']
-                )['part name']
+                name = rpr.get_user_inputs('Please, provide part name:',
+                                           ['part name'])['part name']
                 # print(f'got {name}')
                 self.state('part_name', name)
                 return name
@@ -300,15 +297,12 @@ class TrackInspector:
                 end = i_end
             # print(f'update events by {item}')
             events.update(
-                events_from_take(item.active_take, pitch_type, note_names)
-            )
+                events_from_take(item.active_take, pitch_type, note_names))
         # print('getting global events')
-        global_events = get_global_events(
-            [
-                *ProjectInspector(self.track.project).notations_at_start(),
-                *self.notations_at_start()
-            ], begin, end
-        )
+        global_events = get_global_events([
+            *ProjectInspector(self.track.project).notations_at_start(),
+            *self.notations_at_start()
+        ], begin, end)
         # events = update_events(events, global_events)
         events = {k: events[k] for k in sorted(events)}
         # print('sort staves')
@@ -320,9 +314,8 @@ class TrackInspector:
             staff.apply_global_events(global_events)
         # print(staves)
         # print('render part')
-        lily_dict = render_part(
-            self.part_name, staves, self.track_type, self.octave_offset
-        )
+        lily_dict = render_part(self.part_name, staves, self.track_type,
+                                self.octave_offset)
         lily = f'''{lily_dict['definition']}\n{lily_dict['expression']}'''
         export_path.parent.mkdir(parents=True, exist_ok=True)
         pdf = render(lily, export_path, compile_ly)
@@ -338,14 +331,11 @@ class TrackInspector:
 
 class NotationPitchInspector:
 
-    def set(
-        self, take: rpr.Take, notes: List[rpr.Note],
-        events: List[NotationPitch]
-    ) -> None:
+    def set(self, take: rpr.Take, notes: List[rpr.Note],
+            events: List[NotationPitch]) -> None:
         midi = take.get_midi()
         notations = list(
-            filter(lambda event: NotationPitch.is_reascore_event(event), midi)
-        )
+            filter(lambda event: NotationPitch.is_reascore_event(event), midi))
         for note in notes:
             infos = note.infos
             channel = infos['channel']
@@ -370,14 +360,11 @@ class NotationPitchInspector:
                         if old.update(new) is True:
                             updated_events.append(new)
                 parced.extend(
-                    filter(
-                        lambda event: event not in updated_events, note_events
-                    )
-                )
+                    filter(lambda event: event not in updated_events,
+                           note_events))
                 note_events = parced
-            buf = NotationPitch.to_midi_buf(
-                note_events, Pitch(pitch), channel, original_buf
-            )
+            buf = NotationPitch.to_midi_buf(note_events, Pitch(pitch), channel,
+                                            original_buf)
 
             event = rpr.MIDIEventDict(
                 ppq=ppq,
@@ -400,10 +387,8 @@ def set_accidental_for_selected_notes(accidental: Accidental) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected),
-        [NotationAccidental(Pitch(127), accidental)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationAccidental(Pitch(127), accidental)])
 
 
 @rpr.inside_reaper()
@@ -415,9 +400,8 @@ def set_voice_of_selected_notes(voice: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationVoice(Pitch(127), voice)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationVoice(Pitch(127), voice)])
 
 
 @rpr.inside_reaper()
@@ -442,9 +426,8 @@ def set_staff_of_selected_notes(staff: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationStaff(Pitch(127), staff)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationStaff(Pitch(127), staff)])
 
 
 @rpr.inside_reaper()
@@ -456,9 +439,8 @@ def set_staff_change_of_selected_notes(staff: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationStaffChange(Pitch(127), staff)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationStaffChange(Pitch(127), staff)])
 
 
 @rpr.inside_reaper()
@@ -470,9 +452,8 @@ def set_clef_of_selected_notes(clef: Clef) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))[0]
-    NotationPitchInspector().set(
-        editor.take, [selected], [NotationClef(Pitch(127), clef)]
-    )
+    NotationPitchInspector().set(editor.take, [selected],
+                                 [NotationClef(Pitch(127), clef)])
 
 
 @rpr.inside_reaper()
@@ -484,12 +465,10 @@ def add_dynamics_at_selected_note(dyn: str = '') -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))[0]
-    dynamics = dyn or rpr.get_user_inputs(
-        'type dynamics in lilypond format', ['dyn']
-    )['dyn']
-    NotationPitchInspector().set(
-        editor.take, [selected], [NotationDynamics(Pitch(127), dynamics)]
-    )
+    dynamics = dyn or rpr.get_user_inputs('type dynamics in lilypond format',
+                                          ['dyn'])['dyn']
+    NotationPitchInspector().set(editor.take, [selected],
+                                 [NotationDynamics(Pitch(127), dynamics)])
 
 
 @rpr.inside_reaper()
@@ -501,9 +480,8 @@ def set_selected_notes_as_ghost() -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationGhost(Pitch(127))]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationGhost(Pitch(127))])
 
 
 @rpr.inside_reaper()
@@ -515,9 +493,8 @@ def add_trill_to_selected_notes() -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationTrill(Pitch(127))]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationTrill(Pitch(127))])
 
 
 @rpr.inside_reaper()
@@ -529,9 +506,8 @@ def add_trem_to_selected_notes(trem_denom: int) -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationTrem(Pitch(127), trem_denom)]
-    )
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationTrem(Pitch(127), trem_denom)])
 
 
 @rpr.inside_reaper()
@@ -543,8 +519,8 @@ def ignore_selected_notes() -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = filter(lambda note: note.selected, notes)
-    NotationPitchInspector().set(
-        editor.take, list(selected), [NotationIgnore(Pitch(127))]
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationIgnore(Pitch(127))])
 
 
 @rpr.inside_reaper()
@@ -595,8 +571,7 @@ def grace_begin(grace_type: GraceType) -> None:
     selected = list(filter(lambda note: note.selected, notes))[0]
     NotationPitchInspector().set(
         editor.take, [selected],
-        [NotationGraceBegin(Pitch(127), grace_type=grace_type)]
-    )
+        [NotationGraceBegin(Pitch(127), grace_type=grace_type)])
 
 
 @rpr.inside_reaper()
@@ -608,9 +583,8 @@ def grace_end() -> None:
     editor = rpr.MIDIEditor(ptr)
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))[0]
-    NotationPitchInspector().set(
-        editor.take, [selected], [NotationGraceEnd(Pitch(127))]
-    )
+    NotationPitchInspector().set(editor.take, [selected],
+                                 [NotationGraceEnd(Pitch(127))])
 
 
 @rpr.inside_reaper()
@@ -623,19 +597,16 @@ def set_x_notes_to_selected(dyn: str = '') -> None:
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))
     first, last = selected[0], selected[-1]
-    NotationPitchInspector().set(
-        editor.take, [first], [NotationXNoteBegin(Pitch(127))]
-    )
-    NotationPitchInspector().set(
-        editor.take, [last], [NotationXNoteEnd(Pitch(127))]
-    )
+    NotationPitchInspector().set(editor.take, [first],
+                                 [NotationXNoteBegin(Pitch(127))])
+    NotationPitchInspector().set(editor.take, [last],
+                                 [NotationXNoteEnd(Pitch(127))])
 
 
 @rpr.inside_reaper()
 @rpr.undo_block('add_articulation_to_selected_notes')
-def add_articulation_to_selected_notes(
-    art: str = '', position: str = '-'
-) -> None:
+def add_articulation_to_selected_notes(art: str = '',
+                                       position: str = '-') -> None:
     ptr = RPR.MIDIEditor_GetActive()  # type:ignore
     if not rpr.is_valid_id(ptr):
         return
@@ -643,9 +614,7 @@ def add_articulation_to_selected_notes(
     notes = editor.take.notes
     selected = list(filter(lambda note: note.selected, notes))
     articulation = art or rpr.get_user_inputs(
-        'type articulation in lilypond format', ['art']
-    )['art']
+        'type articulation in lilypond format', ['art'])['art']
     NotationPitchInspector().set(
         editor.take, selected,
-        [NotationArticulation(Pitch(127), articulation, position)]
-    )
+        [NotationArticulation(Pitch(127), articulation, position)])
