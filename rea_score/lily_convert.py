@@ -8,7 +8,7 @@ from rea_score.notation_events import NotationKeySignature
 
 from .dom import Staff, StaffGroup, Voice, events_from_take, split_by_voice
 from .primitives import (
-    ALPHABET, Chord, Event, GlobalNotationEvent, Grace, Key, Length, Pitch,
+    ALPHABET, PITCH_IS_SPACER, Chord, Event, GlobalNotationEvent, Grace, Key, Length, Pitch,
     Position, Scale, Tuplet, Clef
 )
 
@@ -373,7 +373,7 @@ def fraction_to_length(frac: Fraction) -> str:
 
 def render_pitch(pitch: Pitch, key: Key,
                  octave_offset: int) -> Tuple[str, str]:
-    if pitch.midi_pitch is not None:
+    if pitch.midi_pitch not in (None, PITCH_IS_SPACER):
         pitch.midi_pitch += octave_offset * 12
     string = pitch.named_pitch(key)
     string = re.sub('♯', 'is', string)

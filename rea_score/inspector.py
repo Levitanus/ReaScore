@@ -16,7 +16,7 @@ from rea_score.primitives import (Clef, GraceType, NotationEvent,
 from rea_score.notations_pitch import (
     NotationAccidental, NotationArticulation, NotationClef, NotationDynamics,
     NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
-    NotationStaffChange, NotationTrem, NotationTrill,
+    NotationSpacer, NotationStaffChange, NotationTrem, NotationTrill,
     NotationUnnormalizedLength, NotationVoice, NotationStaff,
     NotationXNoteBegin, NotationXNoteEnd)
 from rea_score.notation_events import NotationKeySignature
@@ -534,6 +534,19 @@ def unnormalize_selected_notes() -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(editor.take, list(selected),
                                  [NotationUnnormalizedLength(Pitch(127))])
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('make_selected_notes_spacers')
+def make_selected_notes_spacers() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationSpacer(Pitch(127))])
 
 
 @rpr.inside_reaper()

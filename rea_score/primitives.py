@@ -17,6 +17,7 @@ PITCH_IS_CHORD = 12800
 PITCH_IS_TUPLET = 12801
 PITCH_IS_VOICESPLIT = 12802
 PITCH_IS_GRACE = 12803
+PITCH_IS_SPACER = 12804
 ROUND_QUARTERS = 4
 
 ALPHABET: ty.Dict[int, str] = {
@@ -283,6 +284,8 @@ class Pitch:
     def named_pitch(self, key: Key = Key('C', Scale.major)) -> str:
         if self.midi_pitch is None:
             return 'r'
+        if self.midi_pitch is PITCH_IS_SPACER:
+            return 's'
         if self.midi_pitch == PITCH_IS_CHORD:
             return 'PITCH_IS_CHORD'
         if self.note_name:
@@ -292,6 +295,8 @@ class Pitch:
     def __repr__(self) -> str:
         if self.midi_pitch is None:
             return '<Pitch is rest>'
+        if self.midi_pitch is PITCH_IS_SPACER:
+            return '<Pitch is spacer>'
         if self.midi_pitch == PITCH_IS_CHORD:
             return 'PITCH_IS_CHORD'
         return '<Pitch midi:{}, {} (in c:major), tie={}>'.format(

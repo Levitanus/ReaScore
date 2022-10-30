@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Optional
 from rea_score.primitives import (
-    ALPHABET, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch,
+    ALPHABET, PITCH_IS_SPACER, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch,
     Pitch, TupletRate
 )
 from rea_score.scale import Accidental
@@ -300,6 +300,35 @@ class NotationUnnormalizedLength(NotationPitch, token='unnormalized'):
 
     def __repr__(self) -> str:
         return f'<NotationUnnormalizedLength {self.pitch}>'
+    
+class NotationSpacer(NotationPitch, token='spacer'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, NotationSpacer):
+            return self.pitch == other.pitch
+        return False
+
+    def apply_to_event(self, event: Event) -> None:
+        event.pitch.midi_pitch = PITCH_IS_SPACER
+
+    @property
+    def for_midi(self) -> str:
+        return f'spacer'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationSpacer':
+        return NotationSpacer(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationSpacer {self.pitch}>'
 
 
 class NotationTupletBegin(NotationPitch, Attachment, token='tuplet_begin'):

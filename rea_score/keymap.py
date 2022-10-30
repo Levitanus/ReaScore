@@ -31,6 +31,7 @@ keymap = {
     '?': 'unnormalize_selected_notes()',
     'g': 'set_selected_notes_as_ghost()',
     'r': 'TrackInspector().render()',
+    'S': 'make_selected_notes_spacers()',
     's': 'spread_notes()',
     'v': 'view_score()',
     'c': 'combine_items()',
