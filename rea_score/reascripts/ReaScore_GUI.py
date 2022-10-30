@@ -30,17 +30,15 @@ class Color(IntEnum):
 
 def key_signatures() -> None:
     # ImGui.TreePush(ctx, 'key_signatures')
-    rt = ImGui.TreeNode(
-        ctx, 'key signatures', ImGui.TreeNodeFlags_DefaultOpen()
-    )
+    rt = ImGui.TreeNode(ctx, 'key signatures',
+                        ImGui.TreeNodeFlags_DefaultOpen())
     if not rt:
         return
     # ImGui.BeginGroup(ctx)
     ImGui.Text(ctx, f"From the start: ")
     ImGui.SameLine(ctx)
-    ImGui.TextColored(
-        ctx, Color.value, proj_insp.key_signature_at_start.as_str()
-    )
+    ImGui.TextColored(ctx, Color.value,
+                      proj_insp.key_signature_at_start.as_str())
     ImGui.SetNextItemWidth(ctx, 30)
     rt, buf = ImGui.InputText(ctx, 'tonic', key_signature['tonic'], 10)
     if rt:
@@ -58,36 +56,32 @@ def key_signatures() -> None:
         ImGui.EndCombo(ctx)
     rt = ImGui.Button(ctx, 'to start')
     if rt:
-        proj_insp.key_signature_at_start = Key(
-            key_signature['tonic'], key_signature['scale']
-        )
+        proj_insp.key_signature_at_start = Key(key_signature['tonic'],
+                                               key_signature['scale'])
     ImGui.SameLine(ctx)
     rt = ImGui.Button(ctx, 'at the cursor')
     if rt:
         proj_insp.place_key_signature_at_cursor(
-            Key(key_signature['tonic'], key_signature['scale'])
-        )
+            Key(key_signature['tonic'], key_signature['scale']))
 
     ImGui.TreePop(ctx)
 
 
-def part_name_wgt(
-    part_name: str, track: rpr.Track, no_label: bool = False
-) -> None:
+def part_name_wgt(part_name: str,
+                  track: rpr.Track,
+                  no_label: bool = False) -> None:
     ti = it.TrackInspector(track)
     ImGui.SetNextItemWidth(ctx, 100)
-    rt, v = ImGui.InputText(
-        ctx, '' if no_label else 'part name', part_name, 200
-    )
+    rt, v = ImGui.InputText(ctx, '' if no_label else 'part name', part_name,
+                            200)
     if rt:
         # print(ti, rt, v, track.index, track.name, part_name)
         ti.part_name = v
 
 
 def track_inspector() -> None:
-    rt = ImGui.TreeNode(
-        ctx, 'Track Inspector', ImGui.TreeNodeFlags_DefaultOpen()
-    )
+    rt = ImGui.TreeNode(ctx, 'Track Inspector',
+                        ImGui.TreeNodeFlags_DefaultOpen())
     if not rt:
         return
     track = rpr.Project().selected_tracks[0]
@@ -185,8 +179,7 @@ def actions() -> None:
 
     ImGui.TextColored(ctx, color, 'Set clef to:')
     for i, clef in enumerate(
-        ('treble', 'bass', 'alto', 'tenor', 'percussion')
-    ):
+        ('treble', 'bass', 'alto', 'tenor', 'percussion')):
         if i not in (0, 3):
             ImGui.SameLine(ctx)
         func = f'set_clef_of_selected_notes(Clef.{clef})'
@@ -331,9 +324,8 @@ def score_inspector() -> None:
 
 class DockWidget:
 
-    def __init__(
-        self, ctx: object, project_inspector: it.ProjectInspector
-    ) -> None:
+    def __init__(self, ctx: object,
+                 project_inspector: it.ProjectInspector) -> None:
         self.ctx = ctx
         self.ins = project_inspector
         self.state = cast(int, self.ins.state('GUI_dockstate')) or 0
