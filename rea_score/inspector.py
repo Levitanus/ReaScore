@@ -14,10 +14,10 @@ from reapy_boost.core.item.midi_event import CCShapeFlag
 from rea_score.primitives import (Clef, GraceType, NotationEvent,
                                   NotationMarker, NotationPitch, Pitch)
 from rea_score.notations_pitch import (
-    NotationAccidental, NotationArticulation, NotationClef, NotationDynamics,
-    NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
-    NotationSpacer, NotationStaffChange, NotationTrem, NotationTrill,
-    NotationUnnormalizedLength, NotationVoice, NotationStaff,
+    NotationAccidental, NotationArticulation, NotationBeaming, NotationClef,
+    NotationDynamics, NotationGhost, NotationGraceBegin, NotationGraceEnd,
+    NotationIgnore, NotationSpacer, NotationStaffChange, NotationTrem,
+    NotationTrill, NotationUnnormalizedLength, NotationVoice, NotationStaff,
     NotationXNoteBegin, NotationXNoteEnd)
 from rea_score.notation_events import NotationKeySignature
 
@@ -554,7 +554,7 @@ def make_selected_notes_spacers() -> None:
 def spread_notes() -> None:
     aid = rpr.get_command_id("_RS7cecccb7cf0502b9821cfca8cbc8a621578c2293")
     if aid:
-        rpr, perform_action(aid)
+        rpr.perform_action(aid)
 
 
 @rpr.inside_reaper()
@@ -562,7 +562,7 @@ def spread_notes() -> None:
 def view_score() -> None:
     aid = rpr.get_command_id("_RSb302ebd118f4823805e0a4c2c74e55ec2f4d8795")
     if aid:
-        rpr, perform_action(aid)
+        rpr.perform_action(aid)
 
 
 @rpr.inside_reaper()
@@ -570,7 +570,7 @@ def view_score() -> None:
 def combine_items() -> None:
     aid = rpr.get_command_id("_RS309e578f9acca56952277d83109c5d09cf3d70c0")
     if aid:
-        rpr, perform_action(aid)
+        rpr.perform_action(aid)
 
 
 @rpr.inside_reaper()
@@ -631,3 +631,23 @@ def add_articulation_to_selected_notes(art: str = '',
     NotationPitchInspector().set(
         editor.take, selected,
         [NotationArticulation(Pitch(127), articulation, position)])
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('custom_beaming_for_selected_notes')
+def custom_beaming_for_selected_notes() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = list(filter(lambda note: note.selected, notes))
+    inputs = rpr.get_user_inputs(
+        ('type beaming lists in lilypond format, for example:\n'
+         '0 1 | 0 1 2\n'
+         'for making left part look like 16th and right part like 32nd.\n'
+         'type no value for single beam.'), ['left', 'right'])
+
+    NotationPitchInspector().set(
+        editor.take, selected,
+        [NotationBeaming(Pitch(127), inputs['left'], inputs['right'])])

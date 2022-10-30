@@ -37,6 +37,7 @@ keymap = {
     'c': 'combine_items()',
     'e': 'add_dynamics_at_selected_note()',
     'E': 'add_dynamics_at_selected_note("!")',
+    'B': 'custom_beaming_for_selected_notes()',
     # grace
     # TODO: make one-hotkey
     'g': 'grace_begin(GraceType.grace)',

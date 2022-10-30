@@ -1,9 +1,8 @@
 from enum import Enum
 from typing import Optional
-from rea_score.primitives import (
-    ALPHABET, PITCH_IS_SPACER, Attachment, Clef, Event, GraceType, NotationEvent, NotationPitch,
-    Pitch, TupletRate
-)
+from rea_score.primitives import (ALPHABET, PITCH_IS_SPACER, Attachment, Clef,
+                                  Event, GraceType, NotationEvent,
+                                  NotationPitch, Pitch, TupletRate)
 from rea_score.scale import Accidental
 import reapy_boost as rpr
 
@@ -23,9 +22,8 @@ class NotationAccidental(NotationPitch, token='accidental'):
 
     @classmethod
     def from_midi(cls, pitch: Pitch, string: str) -> 'NotationAccidental':
-        return NotationAccidental(
-            pitch, Accidental.from_str(string.split(':')[1])
-        )
+        return NotationAccidental(pitch,
+                                  Accidental.from_str(string.split(':')[1]))
 
     def update(self, new: NotationEvent) -> bool:
         if not isinstance(new, self.__class__):
@@ -36,8 +34,7 @@ class NotationAccidental(NotationPitch, token='accidental'):
 
     def __repr__(self) -> str:
         return '<NotationAccidental {}, accidental:{}>'.format(
-            self.pitch, self.accidental.to_str()
-        )
+            self.pitch, self.accidental.to_str())
 
 
 class NotationVoice(NotationPitch, token='voice'):
@@ -270,8 +267,8 @@ class NotationIgnore(NotationPitch, token='ignore'):
 
     def __repr__(self) -> str:
         return f'<NotationIgnore {self.pitch}>'
-    
-    
+
+
 class NotationUnnormalizedLength(NotationPitch, token='unnormalized'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -290,7 +287,8 @@ class NotationUnnormalizedLength(NotationPitch, token='unnormalized'):
         return f'unnormalized'
 
     @classmethod
-    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationUnnormalizedLength':
+    def from_midi(cls, pitch: Pitch,
+                  string: str) -> 'NotationUnnormalizedLength':
         return NotationUnnormalizedLength(pitch)
 
     def update(self, new: NotationEvent) -> bool:
@@ -300,7 +298,8 @@ class NotationUnnormalizedLength(NotationPitch, token='unnormalized'):
 
     def __repr__(self) -> str:
         return f'<NotationUnnormalizedLength {self.pitch}>'
-    
+
+
 class NotationSpacer(NotationPitch, token='spacer'):
 
     def __init__(self, pitch: Pitch) -> None:
@@ -349,9 +348,8 @@ class NotationTupletBegin(NotationPitch, Attachment, token='tuplet_begin'):
 
     @classmethod
     def from_midi(cls, pitch: Pitch, string: str) -> 'NotationTupletBegin':
-        return NotationTupletBegin(
-            pitch, TupletRate.from_str(string.split(':')[1])
-        )
+        return NotationTupletBegin(pitch,
+                                   TupletRate.from_str(string.split(':')[1]))
 
     def update(self, new: NotationEvent) -> bool:
         if not isinstance(new, self.__class__):
@@ -394,9 +392,9 @@ class NotationTupletEnd(NotationPitch, Attachment, token='tuplet_end'):
 
 class NotationGraceBegin(NotationPitch, Attachment, token='grace_begin'):
 
-    def __init__(
-        self, pitch: Pitch, grace_type: GraceType = GraceType.grace
-    ) -> None:
+    def __init__(self,
+                 pitch: Pitch,
+                 grace_type: GraceType = GraceType.grace) -> None:
         super().__init__(pitch)
         self.grace_type = grace_type
 
@@ -543,12 +541,10 @@ class NotationXNoteEnd(NotationPitch, Attachment, token='x_end'):
 
 class NotationArticulation(NotationPitch, Attachment, token='artic'):
 
-    def __init__(
-        self,
-        pitch: Pitch,
-        articulation: str = '',
-        position: str = '-'
-    ) -> None:
+    def __init__(self,
+                 pitch: Pitch,
+                 articulation: str = '',
+                 position: str = '-') -> None:
         super().__init__(pitch)
         self.articulation = articulation
         self.position = position
@@ -576,7 +572,40 @@ class NotationArticulation(NotationPitch, Attachment, token='artic'):
         return True
 
     def __repr__(self) -> str:
-        return (
-            f'<NotationArticulation {self.pitch},'
-            f' articulation:{self.articulation}>'
-        )
+        return (f'<NotationArticulation {self.pitch},'
+                f' articulation:{self.articulation}>')
+
+
+class NotationBeaming(NotationPitch, Attachment, token='beaming'):
+
+    def __init__(self, pitch: Pitch, left: str = '', right: str = '') -> None:
+        super().__init__(pitch)
+        self.left = left
+        self.right = right
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return (' \once \override Stem.beaming = #(cons '
+                f'(list {self.left}) (list {self.right})) ')
+
+    @property
+    def for_midi(self) -> str:
+        return f'beaming:{self.left}:{self.right}'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationBeaming':
+        tokens = string.split(':')[1:3]
+        return NotationBeaming(pitch, *tokens)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        super().update(new)
+        self.left = new.left
+        return True
+
+    def __repr__(self) -> str:
+        return (f'<NotationBeaming {self.pitch},'
+                f' left:{self.left},  right:{self.right}>')
