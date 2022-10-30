@@ -270,6 +270,36 @@ class NotationIgnore(NotationPitch, token='ignore'):
 
     def __repr__(self) -> str:
         return f'<NotationIgnore {self.pitch}>'
+    
+    
+class NotationUnnormalizedLength(NotationPitch, token='unnormalized'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, NotationUnnormalizedLength):
+            return self.pitch == other.pitch
+        return False
+
+    def apply_to_event(self, event: Event) -> None:
+        event.unnormalized = True
+
+    @property
+    def for_midi(self) -> str:
+        return f'unnormalized'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationUnnormalizedLength':
+        return NotationUnnormalizedLength(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationUnnormalizedLength {self.pitch}>'
 
 
 class NotationTupletBegin(NotationPitch, Attachment, token='tuplet_begin'):

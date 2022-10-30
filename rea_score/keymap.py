@@ -28,6 +28,7 @@ keymap = {
     # misc
     '`': 'add_trill_to_selected_notes()',
     '~': 'ignore_selected_notes()',
+    '?': 'unnormalize_selected_notes()',
     'g': 'set_selected_notes_as_ghost()',
     'r': 'TrackInspector().render()',
     's': 'spread_notes()',

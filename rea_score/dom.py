@@ -1,6 +1,5 @@
 from enum import Enum
-import re
-from typing import Dict, Iterable, Iterator, List, Optional, TypeVar, Union
+from typing import Dict, Iterable, Iterator, List, Optional, TypeVar
 import reapy_boost as rpr
 from reapy_boost.core.item.midi_event import MIDIEventDict
 
@@ -79,7 +78,6 @@ class EventPackager:
         self.voice.append_to_chord(self.key, event)
 
     def split_by_position(self, event: Event) -> None:
-
         if self.key.bar_end_distance < event.length:
             left, append_part = event.split(
                 Length(float(self.key.bar_end_distance) * 4), tie=True
@@ -88,20 +86,24 @@ class EventPackager:
             left = event
         parts = Fractured.normalized(self.key.bar_end_distance)
         final_events = {}
-        current_pos = self.key
-        for part in parts:
-            if left.length <= part:
-                self.voice.events[current_pos] = left
-                current_pos = Position(
-                    current_pos.position + left.length.length
-                )
-                break
-            left, right = left.split(Length.from_fraction(part), tie=True)
-            if right.length.length == 0:
-                break
-            final_events[current_pos] = left
-            current_pos = Position(current_pos.position + left.length.length)
-            left = right
+        if event.unnormalized:
+            self.voice.events[self.key] = left
+            current_pos = Position.from_fraction(self.key + left.length)
+        else:
+            current_pos = self.key
+            for part in parts:
+                if left.length <= part:
+                    self.voice.events[current_pos] = left
+                    current_pos = Position(
+                        current_pos.position + left.length.length
+                    )
+                    break
+                left, right = left.split(Length.from_fraction(part), tie=True)
+                if right.length.length == 0:
+                    break
+                final_events[current_pos] = left
+                current_pos = Position(current_pos.position + left.length.length)
+                left = right
         if self.key.bar_end_distance < event.length:
             final_events[current_pos] = append_part
         for pos, event in final_events.items():

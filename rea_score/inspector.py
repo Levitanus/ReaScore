@@ -17,9 +17,9 @@ from rea_score.primitives import (
 from rea_score.notations_pitch import (
     NotationAccidental, NotationArticulation, NotationClef, NotationDynamics,
     NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
-    NotationStaffChange, NotationTrem, NotationTrill, NotationVoice,
-    NotationStaff, NotationXNoteBegin, NotationXNoteEnd
-)
+    NotationStaffChange, NotationTrem, NotationTrill,
+    NotationUnnormalizedLength, NotationVoice, NotationStaff,
+    NotationXNoteBegin, NotationXNoteEnd)
 from rea_score.notation_events import NotationKeySignature
 
 from rea_score.scale import Accidental, Key, Scale
@@ -545,7 +545,19 @@ def ignore_selected_notes() -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(
         editor.take, list(selected), [NotationIgnore(Pitch(127))]
-    )
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('unnormalize_selected_notes')
+def unnormalize_selected_notes() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationUnnormalizedLength(Pitch(127))])
 
 
 @rpr.inside_reaper()

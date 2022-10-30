@@ -577,6 +577,7 @@ class Event:
             length, pitch, voice_nr, staff_nr, prefix if prefix else [],
             postfix if postfix else []
         )
+        self.unnormalized = False
 
     @property
     def _params(
@@ -596,7 +597,9 @@ class Event:
         return f"<Event {self._params}>"
 
     def make_chord(self) -> 'Chord':
-        return Chord(*self._params, pitches=[self.pitch])
+        chord =  Chord(*self._params, pitches=[self.pitch])
+        chord.unnormalized = self.unnormalized
+        return chord
 
     def split(self,
               at_length: Length,
