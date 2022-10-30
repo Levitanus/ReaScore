@@ -84,3 +84,20 @@ class NotationText(NotationEvent, Attachment):
 
     def __repr__(self) -> str:
         return f'<NotationText "{self.text}">'
+
+class NotationPlainText(NotationEvent, Attachment):
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def update(self, new: 'NotationEvent') -> bool:
+        if not isinstance(new, NotationPlainText):
+            return False
+        self.text = new.text
+        return True
+
+    def ly_render(self) -> str:
+        return self.text
+
+    def apply_to_event(self, event: 'Event') -> None:
+        event.prefix.append(self)

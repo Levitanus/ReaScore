@@ -17,7 +17,7 @@ keymap = {
     't': 'set_clef_of_selected_notes(Clef.treble)',
     'T': 'set_clef_of_selected_notes(Clef.tenor)',
     'a': 'set_clef_of_selected_notes(Clef.alto)',
-    'b': 'set_clef_of_selected_notes(Clef.bass)',
+    'C': 'set_clef_of_selected_notes(Clef.bass)',
     'p': 'set_clef_of_selected_notes(Clef.percussion)',
     # accidentals
     '=': 'set_accidental_for_selected_notes(Accidental.is_)',
@@ -39,6 +39,7 @@ keymap = {
     'E': 'add_dynamics_at_selected_note("!")',
     'B': 'custom_beaming_for_selected_notes()',
     'b': 'make_beam_group_from_selected_notes()',
+    '\\': 'break_before_selected_notes()',
     # grace
     # TODO: make one-hotkey
     'g': 'grace_begin(GraceType.grace)',

@@ -111,6 +111,11 @@ def track_inspector() -> None:
     # ImGui.SameLine(ctx)
 
     ImGui.SetNextItemWidth(ctx, 100)
+    rt, value = ImGui.Checkbox(ctx, 'breakable beams', ti.breakable_beam)
+    if rt:
+        ti.breakable_beam = value
+
+    ImGui.SetNextItemWidth(ctx, 100)
     rt = ImGui.BeginCombo(ctx, 'pitch type', ti.pitch_type.value)
     if rt:
         for pt in TrackPitchType:

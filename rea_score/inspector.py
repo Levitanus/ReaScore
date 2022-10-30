@@ -15,12 +15,12 @@ from rea_score.primitives import (Clef, GraceType, NotationEvent,
                                   NotationMarker, NotationPitch, Pitch)
 from rea_score.notations_pitch import (
     NotationAccidental, NotationArticulation, NotationBeamGroupBegin,
-    NotationBeamGroupEnd, NotationBeaming, NotationClef, NotationDynamics,
-    NotationGhost, NotationGraceBegin, NotationGraceEnd, NotationIgnore,
-    NotationSpacer, NotationStaffChange, NotationTrem, NotationTrill,
-    NotationUnnormalizedLength, NotationVoice, NotationStaff,
+    NotationBeamGroupEnd, NotationBeaming, NotationBreakBefore, NotationClef,
+    NotationDynamics, NotationGhost, NotationGraceBegin, NotationGraceEnd,
+    NotationIgnore, NotationSpacer, NotationStaffChange, NotationTrem,
+    NotationTrill, NotationUnnormalizedLength, NotationVoice, NotationStaff,
     NotationXNoteBegin, NotationXNoteEnd)
-from rea_score.notation_events import NotationKeySignature
+from rea_score.notation_events import NotationKeySignature, NotationPlainText
 
 from rea_score.scale import Accidental, Key, Scale
 
@@ -206,9 +206,20 @@ class TrackInspector:
 
     def notations_at_start(self) -> List[NotationEvent]:
         notations: List[NotationEvent] = []
+        if self.breakable_beam:
+            notations.append(
+                NotationPlainText("\n\\override Beam.breakable = ##t\n"))
         # if clef := self.clef:
         #     notations.append(NotationClef(Pitch(), clef))
         return notations
+
+    @property
+    def breakable_beam(self) -> bool:
+        return cast(Optional[bool], self.state('breakable_beam')) or False
+
+    @breakable_beam.setter
+    def breakable_beam(self, value: bool) -> None:
+        self.state('breakable_beam', value)
 
     @property
     def clef(self) -> Clef:
@@ -548,6 +559,19 @@ def make_selected_notes_spacers() -> None:
     selected = filter(lambda note: note.selected, notes)
     NotationPitchInspector().set(editor.take, list(selected),
                                  [NotationSpacer(Pitch(127))])
+
+
+@rpr.inside_reaper()
+@rpr.undo_block('break_before_selected_notes')
+def break_before_selected_notes() -> None:
+    ptr = RPR.MIDIEditor_GetActive()  # type:ignore
+    if not rpr.is_valid_id(ptr):
+        return
+    editor = rpr.MIDIEditor(ptr)
+    notes = editor.take.notes
+    selected = filter(lambda note: note.selected, notes)
+    NotationPitchInspector().set(editor.take, list(selected),
+                                 [NotationBreakBefore(Pitch(127))])
 
 
 @rpr.inside_reaper()

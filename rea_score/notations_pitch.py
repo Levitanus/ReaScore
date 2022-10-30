@@ -208,6 +208,34 @@ class NotationTrill(NotationPitch, Attachment, token='trill'):
         return f'<NotationTrill {self.pitch}>'
 
 
+class NotationBreakBefore(NotationPitch, Attachment, token='break_before'):
+
+    def __init__(self, pitch: Pitch) -> None:
+        super().__init__(pitch)
+
+    def apply_to_event(self, event: Event) -> None:
+        event.prefix.append(self)
+
+    def ly_render(self) -> str:
+        return '\\break'
+
+    @property
+    def for_midi(self) -> str:
+        return f'break_before'
+
+    @classmethod
+    def from_midi(cls, pitch: Pitch, string: str) -> 'NotationBreakBefore':
+        return NotationBreakBefore(pitch)
+
+    def update(self, new: NotationEvent) -> bool:
+        if not isinstance(new, self.__class__):
+            return False
+        return super().update(new)
+
+    def __repr__(self) -> str:
+        return f'<NotationBreakBefore {self.pitch}>'
+
+
 class NotationTrem(NotationPitch, token='trem'):
 
     def __init__(self, pitch: Pitch, trem_denom: int) -> None:
@@ -537,7 +565,8 @@ class NotationXNoteEnd(NotationPitch, Attachment, token='x_end'):
 
     def __repr__(self) -> str:
         return f'<NotationXNoteEnd {self.pitch}>'
-    
+
+
 class NotationBeamGroupBegin(NotationPitch, Attachment, token='beam_begin'):
 
     def __init__(self, pitch: Pitch) -> None:
